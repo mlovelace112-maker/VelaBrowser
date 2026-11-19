@@ -38,6 +38,9 @@ struct PasswordPrompt: Identifiable, Equatable {
 final class PasswordVault {
     private(set) var entries: [PasswordEntry] = []
     private(set) var isUnlocked = false
+    /// Logins that also have a 2FA key saved (by `PasswordEntry.id`).
+    /// Kept up to date by `loadCodeIDs()` in OneTimeCodes.swift.
+    var entriesWithCodes: Set<String> = []
 
     @ObservationIgnored private var unlockedAt: Date?
     private static let itemKind = "Vela Password"
@@ -123,6 +126,7 @@ final class PasswordVault {
         ]
         var result: CFTypeRef?
         let status = SecItemCopyMatching(query as CFDictionary, &result)
+        loadCodeIDs()
         guard status == errSecSuccess, let items = result as? [[String: Any]] else {
             entries = []
             return
@@ -185,6 +189,7 @@ final class PasswordVault {
             kSecAttrDescription as String: Self.itemKind,
         ]
         SecItemDelete(query as CFDictionary)
+        removeCode(for: entry, reloading: false)
         reload()
     }
 
