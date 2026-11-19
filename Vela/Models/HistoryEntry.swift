@@ -13,6 +13,7 @@ struct ClosedTab {
     let url: URL
     let groupID: UUID?
     let isPrivate: Bool
+    var containerID: UUID? = nil
 }
 
 enum SidebarSection: String, CaseIterable, Identifiable {

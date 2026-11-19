@@ -155,6 +155,18 @@ struct BrowserCommands: Commands {
                 if let tab = store.selectedTab { store.duplicate(tab) }
             }
             Divider()
+            Button(store.splitPair == nil ? "Split View with New Tab" : "Close Split View") {
+                if store.splitPair == nil { store.openSplitViewWithNewTab() } else { store.closeSplitView() }
+            }
+            .keyboardShortcut("d", modifiers: [.command, .option])
+            Toggle("Vertical Tabs", isOn: Binding(get: { store.verticalTabs }, set: { store.verticalTabs = $0 }))
+                .keyboardShortcut("v", modifiers: [.command, .control])
+            Menu("New Tab in Container") {
+                ForEach(store.containers) { container in
+                    Button(container.name) { store.newTab(container: container.id) }
+                }
+            }
+            Divider()
             Button("Put Other Tabs to Sleep") { store.sleepOtherTabs() }
             Button("Site Settings…") { store.isSiteSettingsVisible = true }
         }

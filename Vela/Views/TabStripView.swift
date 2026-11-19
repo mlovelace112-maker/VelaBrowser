@@ -1,3 +1,4 @@
+import AppKit
 import SwiftUI
 
 /// The row of tabs and tab groups along the top of the window.
@@ -17,11 +18,7 @@ struct TabStripView: View {
                 }
             }
 
-            Button { store.newTab() } label: {
-                Image(systemName: "plus")
-            }
-            .buttonStyle(IconButtonStyle(size: 28))
-            .help("New Tab (⌘T)")
+            NewTabButton()
 
             // Empty space you can drag to move the window (the title bar is hidden).
             Color.clear
@@ -42,10 +39,36 @@ struct TabStripView: View {
     }
 }
 
+/// The + button. Click for a new tab; right-click (or hold) for a private
+/// tab or a tab in a container.
+struct NewTabButton: View {
+    @Environment(BrowserStore.self) private var store
+
+    var body: some View {
+        Button { store.newTab() } label: {
+            Image(systemName: "plus")
+        }
+        .buttonStyle(IconButtonStyle(size: 28))
+        .help("New Tab (⌘T). Right-click for a private tab or a container.")
+        .contextMenu {
+            Button("New Private Tab") { store.newTab(isPrivate: true) }
+            Section("New Tab in Container") {
+                ForEach(store.containers) { container in
+                    Button { store.newTab(container: container.id) } label: {
+                        Label(container.name, systemImage: container.icon)
+                    }
+                }
+            }
+        }
+    }
+}
+
 /// One tab in the strip. Pinned tabs shrink to just their icon.
+/// In vertical tabs, `isVertical` makes it a full-width row.
 struct TabChip: View {
     @Environment(BrowserStore.self) private var store
     let tab: BrowserTab
+    var isVertical = false
     @State private var isHovering = false
 
     var body: some View {
@@ -53,6 +76,8 @@ struct TabChip: View {
         let group = store.group(for: tab)
         let shape = RoundedRectangle(cornerRadius: 9, style: .continuous)
         let compact = Appearance.shared.settings.compactTabs
+        let container = store.container(for: tab)
+        let isInSplit = store.splitPair?.contains(tab.id) == true
 
         HStack(spacing: 8) {
             ZStack(alignment: .bottomTrailing) {
@@ -93,25 +118,51 @@ struct TabChip: View {
         }
         .padding(.horizontal, tab.isPinned ? 0 : 10)
         .frame(width: tab.isPinned ? 36 : nil)
-        .frame(minWidth: tab.isPinned ? 36 : (compact ? 70 : 90), maxWidth: tab.isPinned ? 36 : (compact ? 160 : 200))
+        .frame(minWidth: tab.isPinned ? 36 : (isVertical ? 0 : (compact ? 70 : 90)),
+               maxWidth: tab.isPinned ? 36 : (isVertical ? .infinity : (compact ? 160 : 200)))
         .frame(height: compact ? 26 : 30)
         .background(shape.fill(Color.white.opacity(isSelected ? 0.12 : (isHovering ? 0.06 : 0))))
         .overlay(shape.strokeBorder(
             tab.isPrivate ? Nightglass.accent.opacity(isSelected ? 0.6 : 0.3) : Color.white.opacity(isSelected ? 0.14 : 0)
         ))
         .overlay(alignment: .bottom) {
-            if let group {
+            if let group, !isVertical {
                 Capsule().fill(group.color.color).frame(height: 2).padding(.horizontal, 10)
+            }
+        }
+        // Containers get a colored line on top (on the left in vertical tabs).
+        .overlay(alignment: isVertical ? .leading : .top) {
+            if let container {
+                Capsule().fill(container.color.color)
+                    .frame(width: isVertical ? 3 : nil, height: isVertical ? nil : 2)
+                    .padding(isVertical ? .vertical : .horizontal, isVertical ? 7 : 10)
+            }
+        }
+        // Split view: a small side-by-side icon.
+        .overlay(alignment: .topTrailing) {
+            if isInSplit && !tab.isPinned {
+                Image(systemName: "rectangle.split.2x1.fill")
+                    .font(.system(size: 7, weight: .bold))
+                    .foregroundStyle(Nightglass.accent)
+                    .padding(3)
             }
         }
         .shadow(color: .black.opacity(isSelected ? 0.35 : 0), radius: 8, y: 3)
         // Sleeping tabs fade a little, like Firefox and Edge.
         .opacity(tab.isAsleep && !isSelected ? 0.55 : 1)
         .contentShape(Rectangle())
-        .onTapGesture { store.select(tab) }
+        .onTapGesture {
+            // ⌥-click: show this tab next to the current one.
+            if NSEvent.modifierFlags.contains(.option), store.selectedTabID != tab.id {
+                store.openSplitView(with: tab)
+            } else {
+                store.select(tab)
+            }
+        }
         .onHover { isHovering = $0 }
         .animation(.easeOut(duration: 0.15), value: isHovering)
-        .help(tab.isAsleep ? "\(tab.title) (sleeping to save memory)" : (tab.isPinned ? tab.title : ""))
+        .help(tab.isAsleep ? "\(tab.title) (sleeping to save memory)"
+              : container.map { "\(tab.title) (\($0.name))" } ?? (tab.isPinned ? tab.title : ""))
         .accessibilityElement(children: .contain)
         .accessibilityLabel(tab.title)
         .accessibilityAddTraits(.isButton)
@@ -138,6 +189,21 @@ struct TabContextMenu: View {
         }
         Button("Put Tab to Sleep") { tab.sleep() }
             .disabled(tab.isAsleep || tab.url == nil || store.selectedTabID == tab.id)
+        Button("Open in Split View") { store.openSplitView(with: tab) }
+            .disabled(store.selectedTabID == tab.id)
+        if !tab.isPrivate {
+            Menu("Reopen in Container") {
+                if tab.containerID != nil {
+                    Button("No Container") { store.reopen(tab, inContainer: nil) }
+                }
+                ForEach(store.containers.filter { $0.id != tab.containerID }) { container in
+                    Button { store.reopen(tab, inContainer: container.id) } label: {
+                        Label(container.name, systemImage: container.icon)
+                    }
+                }
+            }
+            .disabled(tab.url == nil)
+        }
 
         Divider()
 
