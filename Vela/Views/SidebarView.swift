@@ -9,13 +9,35 @@ struct SidebarView: View {
         @Bindable var store = store
 
         VStack(alignment: .leading, spacing: 12) {
-            Picker("Section", selection: $store.sidebarSection) {
+            // Section switcher. (A standard segmented picker grew wider than
+            // the sidebar once it had four sections, pushing the sidebar off
+            // the left edge of the window, so these share the width evenly.)
+            HStack(spacing: 2) {
                 ForEach(SidebarSection.allCases) { section in
-                    Label(section.rawValue, systemImage: section.symbol).tag(section)
+                    let isSelected = store.sidebarSection == section
+                    Button { store.sidebarSection = section } label: {
+                        VStack(spacing: 2) {
+                            Image(systemName: section.symbol)
+                                .font(.system(size: 12, weight: .semibold))
+                            Text(section.rawValue)
+                                .font(.system(size: 10, weight: .medium))
+                                .lineLimit(1)
+                                .minimumScaleFactor(0.8)
+                        }
+                        .foregroundStyle(isSelected ? Nightglass.text : Nightglass.mutedText)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 5)
+                        .background(RoundedRectangle(cornerRadius: 7, style: .continuous)
+                            .fill(Color.white.opacity(isSelected ? 0.12 : 0)))
+                        .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel(section.rawValue)
+                    .accessibilityAddTraits(isSelected ? .isSelected : [])
                 }
             }
-            .pickerStyle(.segmented)
-            .labelsHidden()
+            .padding(2)
+            .background(RoundedRectangle(cornerRadius: 9, style: .continuous).fill(Color.black.opacity(0.3)))
 
             HStack(spacing: 8) {
                 Image(systemName: "magnifyingglass")
@@ -52,6 +74,7 @@ struct SidebarView: View {
         .padding(14)
         .frame(width: 290)
         .frame(maxHeight: .infinity)
+        .clipped()
         .background(VisualEffectBackground(material: .sidebar))
         .overlay(alignment: .trailing) {
             Rectangle().fill(Nightglass.stroke).frame(width: 1)
