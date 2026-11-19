@@ -1,0 +1,17 @@
+<?xml version='1.0' encoding='utf-8'?>
+<rss xmlns:sparkle="http://www.andymatuschak.org/xml-namespaces/sparkle" version="2.0">
+  <channel>
+    <title>Vela</title>
+    <description>Updates for the Vela browser</description>
+    <item>
+      <title>Vela 1.0-beta.2</title>
+      <pubDate>Thu, 19 Nov 2026 14:48:07 GMT</pubDate>
+      <sparkle:version>2</sparkle:version>
+      <sparkle:shortVersionString>1.0-beta.2</sparkle:shortVersionString>
+      <sparkle:minimumSystemVersion>15.0</sparkle:minimumSystemVersion>
+      <sparkle:channel>beta</sparkle:channel>
+      <description>&lt;p&gt;A beta build with the newest changes.&lt;/p&gt;&lt;ul&gt;&lt;li&gt;Turn on self-updates with the public update key&lt;/li&gt;&lt;li&gt;Fix package script stopping after the build on GitHub&lt;/li&gt;&lt;li&gt;Add an update pipeline: PR build checks, beta and stable releases, self-updates&lt;/li&gt;&lt;li&gt;Fix school and work sign-in loops with sign-in cookie exceptions&lt;/li&gt;&lt;li&gt;Add Reader mode, live Safari bookmarks, default-browser support and packaging&lt;/li&gt;&lt;li&gt;Add image and video search grids from DuckDuckGo, with animation polish&lt;/li&gt;&lt;li&gt;Add the Spotify mini player along the bottom of the window&lt;/li&gt;&lt;li&gt;Add Claude: address bar quick answers and a side panel that can use your tabs&lt;/li&gt;&lt;li&gt;Add optional Google Safe Browsing checks for pages and downloads&lt;/li&gt;&lt;li&gt;Fix &amp;quot;Sign in with Google&amp;quot;: keep pop-up windows linked to their opener&lt;/li&gt;&lt;li&gt;Add passwords, link checker, safe downloads, script slider, stronger ad blocking and themes&lt;/li&gt;&lt;li&gt;Add privacy shield: ad/tracker blocking, pop-up blocker, cookie manager&lt;/li&gt;&lt;li&gt;Add Safari-style features, richer tab menu, bookmarks sidebar and app icon&lt;/li&gt;&lt;li&gt;Add core Vela browser: tabs, tab groups, address bar, bookmarks&lt;/li&gt;&lt;li&gt;Initial commit&lt;/li&gt;&lt;/ul&gt;</description>
+      <enclosure url="https://github.com/mlovelace112-maker/VelaBrowser/releases/download/v1.0-beta.2/Vela-1.0-beta.2.zip" sparkle:edSignature="kjictR/aRDk3c7V/BL/FtMlmcExZZPyGZHo7MjQitUXy/eVy3GX3khWHjkPHxWHoZxXxhjwi2XhwSb+eu7cJCQ==" length="5868018" type="application/octet-stream" />
+    </item>
+  </channel>
+</rss>
