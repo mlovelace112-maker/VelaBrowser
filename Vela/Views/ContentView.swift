@@ -88,7 +88,11 @@ private struct PageArea: View {
         ZStack {
             NightglassBackdrop()
             if let tab = store.selectedTab {
-                if tab.url == nil {
+                if let search = tab.mediaSearch {
+                    MediaSearchView(tab: tab, search: search)
+                        .id(tab.id)
+                        .transition(.opacity)
+                } else if tab.url == nil {
                     NewTabPage(tab: tab)
                         .transition(.opacity)
                 } else {
@@ -119,6 +123,7 @@ private struct PageArea: View {
         }
         .animation(Nightglass.spring, value: store.passwordPrompt)
         .animation(.easeOut(duration: 0.2), value: store.selectedTab?.url == nil)
+        .animation(.easeOut(duration: 0.2), value: store.selectedTab?.mediaSearch == nil)
         .overlay(alignment: .bottom) {
             if let popup = store.blockedPopup, popup.tabID == store.selectedTabID {
                 PopupBlockedToast(popup: popup)
@@ -127,6 +132,15 @@ private struct PageArea: View {
             }
         }
         .animation(Nightglass.spring, value: store.blockedPopup)
+        .overlay(alignment: .topTrailing) {
+            if let tab = store.selectedTab, tab.mediaSearch == nil, store.passwordPrompt?.tabID != tab.id,
+               let query = BrowserStore.duckDuckGoQuery(tab.url) {
+                MediaSearchPill(tab: tab, query: query)
+                    .padding(14)
+                    .transition(.move(edge: .top).combined(with: .opacity))
+            }
+        }
+        .animation(Nightglass.spring, value: store.selectedTab?.url)
         .overlay(alignment: .top) {
             if let answer = store.claude.quickAnswer {
                 QuickAnswerCard(answer: answer)

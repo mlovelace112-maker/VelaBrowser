@@ -356,6 +356,27 @@ final class BrowserStore {
         return group
     }
 
+    /// Shows Vela's image or video grid for a search, in this tab or the selected one.
+    func showMediaSearch(_ query: String, kind: MediaSearch.Kind, in tab: BrowserTab? = nil) {
+        let trimmed = query.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return }
+        let target = tab ?? selectedTab ?? newTab()
+        let search = MediaSearch(query: trimmed, kind: kind)
+        target.mediaSearch = search
+        target.title = search.title
+        selectedTabID = target.id
+        search.search()
+    }
+
+    /// The search words if this is a DuckDuckGo results page.
+    static func duckDuckGoQuery(_ url: URL?) -> String? {
+        guard let url, let host = url.host(), host == "duckduckgo.com" || host.hasSuffix(".duckduckgo.com"),
+              let query = URLComponents(url: url, resolvingAgainstBaseURL: false)?
+                .queryItems?.first(where: { $0.name == "q" })?.value,
+              !query.isEmpty else { return nil }
+        return query
+    }
+
     /// Opens the Claude panel and asks it something.
     func askClaudeInPanel(_ text: String) {
         isClaudePanelVisible = true

@@ -37,6 +37,8 @@ final class BrowserTab: Identifiable {
     var linkWarning: LinkWarning?
     /// Saved logins for this page's website (they make the key button appear).
     var savedLogins: [PasswordEntry] = []
+    /// Set while the tab shows Vela's image or video search grid instead of a page.
+    var mediaSearch: MediaSearch?
 
     /// Page zoom: 1.0 is 100%. Change it with zoomIn(), zoomOut() or resetZoom().
     private(set) var zoom: Double = 1
@@ -140,6 +142,7 @@ final class BrowserTab: Identifiable {
     }
 
     func load(_ url: URL) {
+        mediaSearch = nil
         self.url = url
         webView.load(URLRequest(url: url))
     }
@@ -230,7 +233,9 @@ final class BrowserTab: Identifiable {
     private func syncFromWebView() {
         if let current = webView.url { url = current }
         let pageTitle = webView.title ?? ""
-        if !pageTitle.isEmpty {
+        if let mediaSearch {
+            title = mediaSearch.title
+        } else if !pageTitle.isEmpty {
             title = pageTitle
         } else if let url {
             title = BrowserStore.siteName(url)

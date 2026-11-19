@@ -86,6 +86,14 @@ The first build takes a minute. If Xcode asks about signing, choose **Sign to Ru
 | **Asks first** | Closing tabs and clicks that would send a form show an **Allow / Don't Allow** card. **Stop** cancels at any point. |
 | **Privacy** | Claude sees a page's text only when it reads that page. Private tabs are never shared. Page text is marked as untrusted, and Claude is told never to follow instructions hidden in it. |
 
+### Image and video search
+| Feature | How to use it |
+|---|---|
+| **Search** | Type something on the New Tab page and click **Images** or **Videos**. On any DuckDuckGo results page, the floating **Images · Videos** pill switches to Vela's grid. The ••• menu has Image Search and Video Search too. |
+| **Image grid** | Tiles fade in one after another and lift on hover. Click one for a large preview with **Visit Page**, **Open Image** and **Copy Image Address**. Scroll for more. |
+| **Video grid** | 16:9 thumbnails with duration, channel, views and date. Click to open the video. |
+| **Privacy** | Results come from DuckDuckGo (powered by Bing), fetched without cookies. SafeSearch is moderate. Back (⌘[) leaves the grid. |
+
 ### Spotify
 | Feature | How to use it |
 |---|---|
@@ -109,7 +117,7 @@ The app also has a custom icon: a "V" drawn as the Vela constellation. Its sourc
 2. ✅ Core browser: tabs, tab groups, address bar, bookmarks, plus Safari-style extras: a sidebar, history, find, zoom, private tabs, pinned tabs and a custom icon. 
 3. ✅ Privacy: pop-up blocker, ad and tracker blocking, cookie manager.
 3½. ✅ Security and looks: passwords, link checker, safe downloads, script slider, pop-under and stronger ad blocking, themes.
-4. ⏳ Extras: ✅ Claude in the address bar and side panel, ✅ the Spotify player **← you are here**, then image and video search.
+4. ✅ Extras: Claude in the address bar and side panel, the Spotify player, image and video search, and animation polish. **← you are here**
 
 ## How the code is organized
 
@@ -125,6 +133,8 @@ Vela/
     DownloadManager.swift    Downloads, the download guard, and macOS quarantine.
   Passwords/
     PasswordVault.swift      The Keychain password store, Touch ID, the generator, fill scripts.
+  Search/
+    MediaSearch.swift        Image and video search through DuckDuckGo.
   Spotify/
     SpotifyAuth.swift        Signing in to Spotify (OAuth with PKCE).
     SpotifyPlayer.swift      Now playing, controls, library, devices and the hidden web player.
@@ -149,6 +159,7 @@ Vela/
     SecurityViews.swift      Link bubble, dangerous-link warning, downloads, "Save password?", Security settings.
     PasswordsView.swift      The Passwords window (⌥⌘P).
     ClaudeViews.swift        The Claude panel, the quick-answer card and Settings ▸ Claude.
+    MediaSearchView.swift    The image and video grids, the preview, and the Images · Videos pill.
     SpotifyViews.swift       The Spotify bar, library and devices popovers, and Settings ▸ Spotify.
     SettingsView.swift       The Settings window and its Appearance tab.
     CookieManagerView.swift  The cookie manager and the Privacy settings tab.

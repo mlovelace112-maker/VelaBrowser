@@ -73,6 +73,23 @@ struct NewTabPage: View {
                 }
             }
 
+            // Search images or videos instead of the web.
+            HStack(spacing: 10) {
+                ForEach(MediaSearch.Kind.allCases) { kind in
+                    Button { store.showMediaSearch(query, kind: kind, in: tab) } label: {
+                        Label(kind.rawValue, systemImage: kind == .images ? "photo.on.rectangle" : "play.rectangle")
+                            .font(.system(size: 12, weight: .medium))
+                            .foregroundStyle(Nightglass.secondaryText)
+                            .padding(.horizontal, 12)
+                            .padding(.vertical, 6)
+                            .background(Capsule().fill(Color.white.opacity(0.06)))
+                    }
+                    .buttonStyle(.plain)
+                    .disabled(query.trimmingCharacters(in: .whitespaces).isEmpty)
+                    .help("Search \(kind.rawValue.lowercased())")
+                }
+            }
+
             if Appearance.shared.settings.showShortcuts {
                 LazyVGrid(
                     columns: Array(repeating: GridItem(.flexible(), spacing: 14), count: 6),

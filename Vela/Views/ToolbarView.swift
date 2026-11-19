@@ -14,9 +14,17 @@ struct ToolbarView: View {
             .help("Show Sidebar (⇧⌘L)")
 
             if let tab = store.selectedTab {
-                Button { tab.webView.goBack() } label: { Image(systemName: "chevron.left") }
+                Button {
+                    if tab.mediaSearch != nil {
+                        // Leave the image or video grid for the page underneath.
+                        tab.mediaSearch = nil
+                        tab.title = tab.webView.title.flatMap { $0.isEmpty ? nil : $0 } ?? "New Tab"
+                    } else {
+                        tab.webView.goBack()
+                    }
+                } label: { Image(systemName: "chevron.left") }
                     .buttonStyle(IconButtonStyle())
-                    .disabled(!tab.canGoBack)
+                    .disabled(!tab.canGoBack && tab.mediaSearch == nil)
                     .help("Back (⌘[)")
 
                 Button { tab.webView.goForward() } label: { Image(systemName: "chevron.right") }
@@ -124,6 +132,11 @@ struct PageMenu: View {
             Divider()
             Button("Passwords…") { store.isPasswordsVisible = true }
             Divider()
+            Button("Image Search") { store.showMediaSearch(mediaQuery, kind: .images, in: tab) }
+                .disabled(mediaQuery.isEmpty)
+            Button("Video Search") { store.showMediaSearch(mediaQuery, kind: .videos, in: tab) }
+                .disabled(mediaQuery.isEmpty)
+            Divider()
             Button("Summarize Page with Claude") { store.askClaudeInPanel("Summarize this page.") }
                 .disabled(tab.url == nil || tab.isPrivate)
             Divider()
@@ -149,6 +162,11 @@ struct PageMenu: View {
         .fixedSize()
         .frame(width: 30, height: 30)
         .help("More")
+    }
+
+    /// What to search images and videos for: your DuckDuckGo search, or this page's title.
+    private var mediaQuery: String {
+        BrowserStore.duckDuckGoQuery(tab.url) ?? tab.mediaSearch?.query ?? (tab.url == nil ? "" : tab.title)
     }
 }
 
