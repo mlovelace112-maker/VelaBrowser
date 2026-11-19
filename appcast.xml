@@ -4,6 +4,16 @@
     <title>Vela</title>
     <description>Updates for the Vela browser</description>
     <item>
+      <title>Vela 1.0-beta.8</title>
+      <pubDate>Thu, 19 Nov 2026 17:02:46 GMT</pubDate>
+      <sparkle:version>8</sparkle:version>
+      <sparkle:shortVersionString>1.0-beta.8</sparkle:shortVersionString>
+      <sparkle:minimumSystemVersion>15.0</sparkle:minimumSystemVersion>
+      <sparkle:channel>beta</sparkle:channel>
+      <description>&lt;p&gt;A beta build with the newest changes.&lt;/p&gt;&lt;ul&gt;&lt;li&gt;Privacy and tabs: fingerprinting, site permissions, email masking, session restore, tab sleeping, PiP, download scanning&lt;/li&gt;&lt;/ul&gt;</description>
+      <enclosure url="https://github.com/mlovelace112-maker/VelaBrowser/releases/download/v1.0-beta.8/Vela-1.0-beta.8.zip" sparkle:edSignature="yQ0DRGgSFUsIB5LsQubIGGERFXvwI6MF6Vp3WTt3Flq20nvEC7Ik2oj0iIAQpmJSb+KpAwPTODG2GZWxFJYeDw==" length="6400711" type="application/octet-stream" />
+    </item>
+    <item>
       <title>Vela 1.0-beta.7</title>
       <pubDate>Thu, 19 Nov 2026 16:59:31 GMT</pubDate>
       <sparkle:version>7</sparkle:version>
