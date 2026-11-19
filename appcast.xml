@@ -4,6 +4,16 @@
     <title>Vela</title>
     <description>Updates for the Vela browser</description>
     <item>
+      <title>Vela 1.0-beta.10</title>
+      <pubDate>Thu, 19 Nov 2026 19:55:34 GMT</pubDate>
+      <sparkle:version>10</sparkle:version>
+      <sparkle:shortVersionString>1.0-beta.10</sparkle:shortVersionString>
+      <sparkle:minimumSystemVersion>15.0</sparkle:minimumSystemVersion>
+      <sparkle:channel>beta</sparkle:channel>
+      <description>&lt;p&gt;A beta build with the newest changes.&lt;/p&gt;&lt;ul&gt;&lt;li&gt;Add address bar suggestions from tabs, bookmarks, history and DuckDuckGo&lt;/li&gt;&lt;/ul&gt;</description>
+      <enclosure url="https://github.com/mlovelace112-maker/VelaBrowser/releases/download/v1.0-beta.10/Vela-1.0-beta.10.zip" sparkle:edSignature="Iwi7yHTx5oSvr/DMY1XJ1HPIdJCe7g+EEIM34LsaydkcEXTARbgiZbqdmWtjcQqoVKjdpZfaEWKJvfJSiSlHBA==" length="6513450" type="application/octet-stream" />
+    </item>
+    <item>
       <title>Vela 1.0-beta.9</title>
       <pubDate>Thu, 19 Nov 2026 17:36:22 GMT</pubDate>
       <sparkle:version>9</sparkle:version>
