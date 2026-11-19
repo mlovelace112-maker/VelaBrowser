@@ -1,3 +1,4 @@
+import AppKit
 import SwiftUI
 
 /// Sidebar, back, forward, reload, the address bar, bookmarks and share.
@@ -233,8 +234,15 @@ struct AddressBar: View {
     /// click on a suggestion still lands.
     @State private var showsSuggestions = false
     @State private var showsSiteInfo = false
+    /// Where the address bar and the suggestion list are in the window, so a
+    /// click anywhere else can close the list.
+    @State private var fieldFrame: CGRect = .zero
+    @State private var listFrame: CGRect = .zero
+    /// Watches clicks and Esc while the list is open (see watchForDismiss).
+    @State private var dismissMonitor: Any?
 
-    var body: some View {
+    /// The address bar itself: lock, text field and the small buttons.
+    @ViewBuilder private var fieldBox: some View {
         let shape = RoundedRectangle(cornerRadius: 11, style: .continuous)
 
         HStack(spacing: 8) {
@@ -369,6 +377,7 @@ struct AddressBar: View {
         }
         .padding(.horizontal, 12)
         .frame(height: 34)
+        .onGeometryChange(for: CGRect.self) { $0.frame(in: .global) } action: { fieldFrame = $0 }
         .background(shape.fill(Color.black.opacity(0.35)))
         .overlay(
             shape.strokeBorder(
@@ -379,20 +388,39 @@ struct AddressBar: View {
         .shadow(color: Nightglass.accent.opacity(isFocused ? 0.3 : 0), radius: 10)
         .animation(.easeOut(duration: 0.2), value: isFocused)
         .animation(.easeOut(duration: 0.15), value: isFocused && canAsk)
+    }
+
+    /// The address bar with the suggestion list dropping down under it.
+    private var fieldWithSuggestions: some View {
+        fieldBox
         .overlay(alignment: .topLeading) {
             if showsSuggestions && !suggestions.items.isEmpty {
                 SuggestionList(engine: suggestions, onPick: open)
+                    .onGeometryChange(for: CGRect.self) { $0.frame(in: .global) } action: { listFrame = $0 }
                     .offset(y: 40)
                     .transition(.opacity.combined(with: .move(edge: .top)))
             }
         }
         .animation(.easeOut(duration: 0.12), value: showsSuggestions && !suggestions.items.isEmpty)
+    }
+
+    // Built in three parts (fieldBox, fieldWithSuggestions, body) so the
+    // Swift compiler can check it in reasonable time.
+    var body: some View {
+        fieldWithSuggestions
         .onChange(of: text) {
             if isFocused {
                 typed = text
-                if text != displayText { suggestions.update(for: text, store: store, tab: tab) }
+                if text != displayText {
+                    suggestions.update(for: text, store: store, tab: tab)
+                    showsSuggestions = true // typing again after Esc brings them back
+                }
             }
         }
+        .onChange(of: showsSuggestions) {
+            if showsSuggestions { watchForDismiss() } else { stopWatchingForDismiss() }
+        }
+        .onDisappear { stopWatchingForDismiss() }
         .onChange(of: isFocused) {
             if isFocused {
                 showsSuggestions = true
@@ -409,9 +437,50 @@ struct AddressBar: View {
         }
         .onAppear { text = displayText }
         .onChange(of: tab.url) { if !isFocused { text = displayText } }
-        .onChange(of: tab.id) { text = displayText }
+        .onChange(of: tab.id) {
+            hideSuggestions()
+            text = displayText
+        }
         .onChange(of: isFocused) { if !isFocused { text = displayText } }
         .onChange(of: store.addressBarFocusRequest) { isFocused = true }
+    }
+
+    /// Closes the suggestion list (what you typed stays in the address bar).
+    private func hideSuggestions() {
+        showsSuggestions = false
+        suggestions.clear()
+    }
+
+    /// While the list is open, a click anywhere outside the address bar and
+    /// the list closes it, and so does Esc. SwiftUI alone misses clicks on
+    /// the web page, because WebKit takes those clicks itself.
+    private func watchForDismiss() {
+        guard dismissMonitor == nil else { return }
+        dismissMonitor = NSEvent.addLocalMonitorForEvents(matching: [.leftMouseDown, .rightMouseDown, .otherMouseDown, .keyDown]) { event in
+            if event.type == .keyDown {
+                // 53 is the Esc key.
+                guard event.keyCode == 53, showsSuggestions, !suggestions.items.isEmpty else { return event }
+                hideSuggestions()
+                return nil
+            }
+            guard let content = event.window?.contentView else {
+                hideSuggestions()
+                return event
+            }
+            // AppKit counts up from the bottom of the window; SwiftUI counts
+            // down from the top.
+            let point = CGPoint(x: event.locationInWindow.x,
+                                y: content.bounds.height - event.locationInWindow.y)
+            if !fieldFrame.contains(point) && !listFrame.contains(point) {
+                hideSuggestions()
+            }
+            return event
+        }
+    }
+
+    private func stopWatchingForDismiss() {
+        if let dismissMonitor { NSEvent.removeMonitor(dismissMonitor) }
+        dismissMonitor = nil
     }
 
     /// You've typed something other than the page's address.
