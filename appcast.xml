@@ -4,6 +4,16 @@
     <title>Vela</title>
     <description>Updates for the Vela browser</description>
     <item>
+      <title>Vela 1.0-beta.15</title>
+      <pubDate>Thu, 19 Nov 2026 20:43:49 GMT</pubDate>
+      <sparkle:version>15</sparkle:version>
+      <sparkle:shortVersionString>1.0-beta.15</sparkle:shortVersionString>
+      <sparkle:minimumSystemVersion>15.0</sparkle:minimumSystemVersion>
+      <sparkle:channel>beta</sparkle:channel>
+      <description>&lt;p&gt;A beta build with the newest changes.&lt;/p&gt;&lt;ul&gt;&lt;li&gt;Keep the Claude panel within its width&lt;/li&gt;&lt;li&gt;Fix sidebar cut off on the left, and a 2FA site-matching bug&lt;/li&gt;&lt;/ul&gt;</description>
+      <enclosure url="https://github.com/mlovelace112-maker/VelaBrowser/releases/download/v1.0-beta.15/Vela-1.0-beta.15.zip" sparkle:edSignature="oWu9+ruITcbqZAtZwvlra2m3Is38PHYqnJY2bFevq1bp/SQyuz2htyanckg8JXBJpD3OGGNH2QYgNIgHTvrsAA==" length="7085690" type="application/octet-stream" />
+    </item>
+    <item>
       <title>Vela 1.0-beta.14</title>
       <pubDate>Thu, 19 Nov 2026 20:19:32 GMT</pubDate>
       <sparkle:version>14</sparkle:version>
