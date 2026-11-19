@@ -86,6 +86,8 @@ struct PrivacySettings: Codable, Equatable {
 
     // Passwords
     var offerToSavePasswords = true
+    /// Fill your saved login when you click into a login form.
+    var autoFillPasswords = true
     /// Sites where you chose "Never for This Site" when Vela offered to save a password.
     var neverSavePasswordSites: Set<String> = []
 
@@ -169,6 +171,7 @@ struct PrivacySettings: Codable, Equatable {
         blockDangerousDownloads = try c.decodeIfPresent(Bool.self, forKey: .blockDangerousDownloads) ?? d.blockDangerousDownloads
         safeBrowsingEnabled = try c.decodeIfPresent(Bool.self, forKey: .safeBrowsingEnabled) ?? d.safeBrowsingEnabled
         offerToSavePasswords = try c.decodeIfPresent(Bool.self, forKey: .offerToSavePasswords) ?? d.offerToSavePasswords
+        autoFillPasswords = try c.decodeIfPresent(Bool.self, forKey: .autoFillPasswords) ?? d.autoFillPasswords
         neverSavePasswordSites = try c.decodeIfPresent(Set<String>.self, forKey: .neverSavePasswordSites) ?? d.neverSavePasswordSites
     }
 

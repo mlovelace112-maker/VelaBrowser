@@ -155,7 +155,19 @@ final class BrowserStore {
             self?.downloadManager.track(download, pageURL: tab?.url)
         }
         tab.onLoginFormFound = { [weak self, weak tab] host in
-            if let tab, let self { tab.savedLogins = self.passwordVault.entries(for: host) }
+            guard let tab, let self else { return }
+            tab.savedLogins = self.passwordVault.entries(for: host)
+            // Already unlocked in the last 10 minutes and only one login for
+            // this site? Fill it right away, no click needed.
+            if self.privacy.autoFillPasswords, !tab.didAutoFill,
+               tab.savedLogins.count == 1, self.passwordVault.isRecentlyUnlocked {
+                Task { await self.fill(tab.savedLogins[0], in: tab) }
+            }
+        }
+        tab.onLoginFieldFocused = { [weak self, weak tab] host in
+            guard let tab, let self else { return }
+            if tab.savedLogins.isEmpty { tab.savedLogins = self.passwordVault.entries(for: host) }
+            self.autoFill(in: tab)
         }
         tab.onLoginSubmitted = { [weak self, weak tab] host, username, password in
             if let tab { self?.offerToSave(host: host, username: username, password: password, from: tab) }
@@ -684,10 +696,25 @@ final class BrowserStore {
         passwordPrompt = nil
     }
 
+    /// You clicked into a login box: fill your saved login (asking for
+    /// Touch ID if needed), or show the list when there's more than one.
+    /// Only happens once per page, so clicking around doesn't keep asking.
+    func autoFill(in tab: BrowserTab) {
+        guard privacy.autoFillPasswords, !tab.didAutoFill, !tab.savedLogins.isEmpty,
+              tab.id == selectedTab?.id else { return }
+        tab.didAutoFill = true
+        if tab.savedLogins.count == 1 {
+            Task { await fill(tab.savedLogins[0], in: tab) }
+        } else {
+            tab.isLoginPickerShown = true
+        }
+    }
+
     /// Asks for Touch ID, then types the saved login into the page.
     func fill(_ entry: PasswordEntry, in tab: BrowserTab) async {
         guard await passwordVault.unlock(reason: "fill your password for \(entry.server)"),
               let password = passwordVault.password(for: entry) else { return }
+        tab.isLoginPickerShown = false
         tab.fillLogin(username: entry.account, password: password, for: entry.server)
     }
 

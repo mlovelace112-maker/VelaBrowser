@@ -253,24 +253,21 @@ struct AddressBar: View {
             }
 
             // Key: fill a saved password into this page's login form.
+            //      It opens by itself when you click into a login box and
+            //      this site has more than one saved login.
             if !tab.savedLogins.isEmpty {
-                Menu {
-                    ForEach(tab.savedLogins) { entry in
-                        Button(entry.account.isEmpty ? "Password for \(entry.server)" : entry.account) {
-                            Task { await store.fill(entry, in: tab) }
-                        }
-                    }
-                    Divider()
-                    Button("Open Passwords…") { store.isPasswordsVisible = true }
-                } label: {
+                @Bindable var tab = tab
+                Button { tab.isLoginPickerShown.toggle() } label: {
                     Image(systemName: "key.fill")
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundStyle(Nightglass.accent)
                 }
-                .menuStyle(.borderlessButton)
-                .menuIndicator(.hidden)
-                .fixedSize()
-                .tint(Nightglass.accent)
+                .buttonStyle(.plain)
                 .help("Fill saved password")
                 .accessibilityLabel("Fill saved password")
+                .popover(isPresented: $tab.isLoginPickerShown, arrowEdge: .bottom) {
+                    LoginPicker(tab: tab)
+                }
             }
 
             // Reader: show just the article.
@@ -339,5 +336,44 @@ struct AddressBar: View {
     private var iconName: String {
         if tab.url == nil { return "magnifyingglass" }
         return tab.url?.scheme == "https" ? "lock.fill" : "globe"
+    }
+}
+
+/// The list under the key button: pick a saved login to fill.
+private struct LoginPicker: View {
+    @Environment(BrowserStore.self) private var store
+    let tab: BrowserTab
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 2) {
+            Text("Fill a saved login")
+                .font(.system(size: 11, weight: .semibold))
+                .foregroundStyle(Nightglass.mutedText)
+                .padding(.horizontal, 10)
+                .padding(.bottom, 4)
+            ForEach(tab.savedLogins) { entry in
+                Button {
+                    Task { await store.fill(entry, in: tab) }
+                } label: {
+                    Label(entry.account.isEmpty ? "Password for \(entry.server)" : entry.account,
+                          systemImage: "person.crop.circle")
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 6)
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+            }
+            Divider().padding(.vertical, 4)
+            Button("Open Passwords…") {
+                tab.isLoginPickerShown = false
+                store.isPasswordsVisible = true
+            }
+            .buttonStyle(.plain)
+            .padding(.horizontal, 10)
+            .padding(.bottom, 4)
+        }
+        .padding(.vertical, 10)
+        .frame(minWidth: 220)
     }
 }

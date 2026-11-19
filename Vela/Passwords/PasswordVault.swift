@@ -81,6 +81,12 @@ final class PasswordVault {
         }
     }
 
+    /// True if you unlocked with Touch ID in the last 10 minutes.
+    var isRecentlyUnlocked: Bool {
+        guard isUnlocked, let unlockedAt else { return false }
+        return Date().timeIntervalSince(unlockedAt) < Self.unlockDuration
+    }
+
     func lock() {
         isUnlocked = false
         unlockedAt = nil
@@ -235,10 +241,25 @@ enum PasswordScripts {
             try { window.webkit.messageHandlers.\(ContentBlocker.clientMessageName).postMessage(message); } catch (e) {}
           };
         \(helpers)
+          // A login form: a password box, or (on "email first, password
+          // next" pages like Google's) a box marked as a username or email.
+          const loginField = () => passwordField() || usernameField(null);
           let announced = false;
           const announce = () => {
-            if (!announced && passwordField()) { announced = true; post({ type: 'loginForm' }); }
+            if (!announced && loginField()) { announced = true; post({ type: 'loginForm', hasPassword: !!passwordField() }); }
           };
+          // Clicking into a login box is the cue to fill a saved login.
+          const isLoginInput = (el) => !!(el && el.tagName === 'INPUT' && (
+            el.type === 'password' ||
+            /username|email/.test(el.autocomplete || '') || el.type === 'email' ||
+            (el === usernameField(passwordField()))
+          ));
+          document.addEventListener('focusin', (e) => {
+            if (isLoginInput(e.target)) {
+              announced = true;
+              post({ type: 'loginFieldFocused' });
+            }
+          }, true);
           let lastSent = '';
           const capture = (root) => {
             const pw = passwordField(root) || passwordField();
@@ -261,8 +282,15 @@ enum PasswordScripts {
           announce();
           let timer = null;
           new MutationObserver(() => {
-            if (announced || timer) return;
-            timer = setTimeout(() => { timer = null; announce(); }, 700);
+            if (timer) return;
+            timer = setTimeout(() => {
+              timer = null;
+              // Single-page sites swap the email box for a password box
+              // without loading a new page: announce that as a new form.
+              const pw = passwordField();
+              if (pw && !pw.__velaSeen) { pw.__velaSeen = true; announced = false; }
+              announce();
+            }, 500);
           }).observe(document.documentElement, { childList: true, subtree: true });
         })();
         """
@@ -282,8 +310,10 @@ enum PasswordScripts {
     };
     const pw = passwordField();
     const user = usernameField(pw);
-    if (user && username) setValue(user, username);
+    // Don't overwrite a username you already typed differently.
+    if (user && username && (!user.value || user.value === username)) setValue(user, username);
     if (pw) setValue(pw, password);
-    return !!(pw || user);
+    if (pw) pw.focus(); else if (user) user.focus();
+    return pw ? 'password' : (user ? 'username' : 'none');
     """
 }

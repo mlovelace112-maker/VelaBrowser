@@ -37,6 +37,13 @@ final class BrowserTab: Identifiable {
     var linkWarning: LinkWarning?
     /// Saved logins for this page's website (they make the key button appear).
     var savedLogins: [PasswordEntry] = []
+    /// Shows the list of saved logins under the key button.
+    var isLoginPickerShown = false
+    /// Set once Vela has filled (or tried to fill) a login on this page, so
+    /// clicking around the form doesn't keep asking for Touch ID.
+    var didAutoFill = false
+    /// True once a password (not just a username) was filled on this page.
+    @ObservationIgnored var didFillPassword = false
     /// Set while the tab shows Vela's image or video search grid instead of a page.
     var mediaSearch: MediaSearch?
     /// Set while Reader mode shows this page's article.
@@ -62,6 +69,8 @@ final class BrowserTab: Identifiable {
     @ObservationIgnored var onDownload: (@MainActor (WKDownload) -> Void)?
     /// Called when the page shows a password box. Passes the website's host.
     @ObservationIgnored var onLoginFormFound: (@MainActor (String) -> Void)?
+    /// Called when you click into a login box. Passes the website's host.
+    @ObservationIgnored var onLoginFieldFocused: (@MainActor (String) -> Void)?
     /// Called when you submit a login: host, username, password.
     @ObservationIgnored var onLoginSubmitted: (@MainActor (String, String, String) -> Void)?
     /// Asks Google Safe Browsing about an address (set by BrowserStore).
@@ -192,19 +201,36 @@ final class BrowserTab: Identifiable {
 
     /// Types a saved login into the page's login form.
     func fillLogin(username: String, password: String, for server: String) {
-        // Only ever fill into the website the login was saved for.
-        if let loginFrame {
-            guard PasswordVault.normalize(loginFrame.securityOrigin.host) == server else { return }
+        // Only ever fill into the website the login was saved for. Prefer the
+        // frame that showed the login form; fall back to the page itself.
+        let frame: WKFrameInfo?
+        if let loginFrame, PasswordVault.normalize(loginFrame.securityOrigin.host) == server {
+            frame = loginFrame
+        } else if let url, PasswordVault.normalize(url.host() ?? "") == server {
+            frame = nil
         } else {
-            guard let url, PasswordVault.normalize(url.host() ?? "") == server else { return }
+            return
         }
+        didAutoFill = true
+        let arguments: [String: Any] = ["username": username, "password": password]
         webView.callAsyncJavaScript(
-            PasswordScripts.fillFunction,
-            arguments: ["username": username, "password": password],
-            in: loginFrame,
-            in: .defaultClient,
-            completionHandler: nil
-        )
+            PasswordScripts.fillFunction, arguments: arguments, in: frame, in: .defaultClient
+        ) { [weak self] result in
+            if case .success(let filled) = result, filled as? String == "password" {
+                self?.didFillPassword = true
+            }
+            // The form's frame may have gone away (the page swapped it out).
+            // Try once more in the page itself.
+            guard case .failure = result, frame != nil, let self,
+                  let url = self.url, PasswordVault.normalize(url.host() ?? "") == server else { return }
+            self.webView.callAsyncJavaScript(
+                PasswordScripts.fillFunction, arguments: arguments, in: nil, in: .defaultClient
+            ) { [weak self] retry in
+                if case .success(let filled) = retry, filled as? String == "password" {
+                    self?.didFillPassword = true
+                }
+            }
+        }
     }
 
     func setPopupsAllowed(_ allowed: Bool) {
@@ -217,6 +243,9 @@ final class BrowserTab: Identifiable {
         popupsBlocked = []
         hoveredLink = nil
         savedLogins = []
+        isLoginPickerShown = false
+        didAutoFill = false
+        didFillPassword = false
         loginFrame = nil
     }
 
@@ -400,7 +429,14 @@ final class TabCoordinator: NSObject, WKNavigationDelegate, WKUIDelegate, WKScri
         case "loginForm":
             guard isSecure else { return }
             tab.loginFrame = frame
+            // "Email first, password next" pages: Vela filled the email, and
+            // now the password box appeared. Allow one more fill for it.
+            if body["hasPassword"] as? Bool == true, !tab.didFillPassword { tab.didAutoFill = false }
             tab.onLoginFormFound?(origin.host)
+        case "loginFieldFocused":
+            guard isSecure else { return }
+            tab.loginFrame = frame
+            tab.onLoginFieldFocused?(origin.host)
         case "credentials":
             guard isSecure,
                   let username = body["username"] as? String,
