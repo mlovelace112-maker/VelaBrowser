@@ -84,6 +84,7 @@ If a step fails, make the same change by hand in the repo's **Settings**: Code s
 | Feature | How to use it |
 |---|---|
 | Address bar | Type an address or a search (searches go to DuckDuckGo). ⌘L jumps to the address bar. |
+| Site info | Click the 🔒 at the left of the address bar to see whether the connection is secure, who issued the site's certificate and when it expires (**Show Certificate…** opens Apple's full viewer), what the site is allowed to do, and a button to clear its cookies and data. |
 | Suggestions as you type | The address bar lists matching open tabs (**Switch to Tab**), bookmarks (Vela's and Safari's), history and DuckDuckGo search ideas. When a site's name starts with what you typed ("git" → github.com), it becomes the **Top Hit** and Return opens it. ↑/↓ pick a row, Esc closes the list. DuckDuckGo ideas are never fetched in private tabs, and you can turn them off in the shield panel (**DuckDuckGo suggestions as I type**). |
 | Back, forward and reload | ⌘[, ⌘] and ⌘R, or swipe with two fingers on a trackpad |
 | Find on page | ⌘F. Return goes to the next match, ⇧Return to the previous one, and Esc closes the bar. |
@@ -152,6 +153,7 @@ If a step fails, make the same change by hand in the repo's **Settings**: Code s
 | **Password store** | Passwords are saved in the macOS Keychain, never in a normal file. Open them with ⌥⌘P or the ••• menu. Touch ID (or your Mac password) unlocks them for 10 minutes. |
 | **Save on sign-in** | After you sign in, Vela asks "Save password?" (or "Update?"). Choose **Never for This Site** to stop asking. Private tabs never save. |
 | **Autofill** | On a page with a login form, a 🔑 key appears in the address bar. Pick an account, confirm with Touch ID, and Vela fills it in. It only ever fills into the exact website the login was saved for. |
+| **2FA codes** | Vela can make the 6-digit two-factor codes too. They come in automatically when you import from the Passwords app, or click **123** next to a login in Passwords (⌥⌘P) and paste the site's setup key. When Vela fills that login, it also copies the code and types it in when the site asks for it. Codes show live in Passwords with a countdown ring. |
 | **Import from the Passwords app** | In the Passwords app choose **File ▸ Export All Passwords…**. Then in Vela's Passwords window click **Import…** and pick the file. Vela saves every login to the Keychain and then shreds the exported file (overwrites it, then deletes it). Exports from Chrome, Firefox, Brave, Edge and 1Password work too. Apple doesn't let browsers other than Safari read the Passwords app directly, so this is the safe way in. |
 | **Password check** | Click **Check** in the Passwords window. Vela lists weak and reused passwords, and (if you leave it on) ones found in data breaches. The breach check uses Have I Been Pwned privately: only the first 5 characters of a scrambled code of each password are sent, never the password. |
 | **Generator** | The Passwords window makes strong random passwords. Copied passwords are hidden from clipboard-history apps and cleared after 90 seconds. |

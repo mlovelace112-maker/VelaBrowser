@@ -209,15 +209,23 @@ struct AddressBar: View {
     /// Stays true for a moment after the address bar loses focus, so a
     /// click on a suggestion still lands.
     @State private var showsSuggestions = false
+    @State private var showsSiteInfo = false
 
     var body: some View {
         let shape = RoundedRectangle(cornerRadius: 11, style: .continuous)
 
         HStack(spacing: 8) {
-            Image(systemName: iconName)
-                .font(.system(size: 12, weight: .semibold))
-                .foregroundStyle(tab.url?.scheme == "https" ? Nightglass.spotify : Nightglass.mutedText)
-                .accessibilityHidden(true)
+            Button { showsSiteInfo.toggle() } label: {
+                Image(systemName: iconName)
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundStyle(tab.url?.scheme == "https" ? Nightglass.spotify : Nightglass.mutedText)
+                    .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .disabled(tab.url == nil)
+            .help("Connection, certificate and site permissions")
+            .accessibilityLabel("Site information")
+            .popover(isPresented: $showsSiteInfo, arrowEdge: .bottom) { SiteInfoView(tab: tab) }
 
             if tab.isPrivate {
                 Text("Private")

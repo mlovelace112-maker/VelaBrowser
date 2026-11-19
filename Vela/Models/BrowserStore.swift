@@ -208,7 +208,9 @@ final class BrowserStore {
             self?.newTab(url: url, opener: tab)
         }
         tab.onFinishLoading = { [weak self, weak tab] in
-            if let tab { self?.recordVisit(tab) }
+            guard let self, let tab else { return }
+            self.recordVisit(tab)
+            if tab.pendingCode != nil { Task { await self.fillPendingCode(in: tab) } }
         }
         tab.onTrackerFound = { [weak self, weak tab] domain in
             if let tab { self?.recordTracker(domain, in: tab) }
@@ -963,6 +965,25 @@ final class BrowserStore {
               let password = passwordVault.password(for: entry) else { return }
         tab.isLoginPickerShown = false
         tab.fillLogin(username: entry.account, password: password, for: entry.server)
+        // A 2FA code too? Copy it, and type it in when the code box appears
+        // (on this page or the next one, within 3 minutes).
+        if passwordVault.hasCode(entry), let generator = passwordVault.oneTimeCode(for: entry) {
+            PasswordVault.copyToClipboard(generator.code())
+            tab.pendingCode = PendingCode(entry: entry, generator: generator, until: Date().addingTimeInterval(180))
+            try? await Task.sleep(for: .seconds(1))
+            await fillPendingCode(in: tab)
+        }
+    }
+
+    /// Types a waiting 2FA code into the page, if it has a code box.
+    func fillPendingCode(in tab: BrowserTab) async {
+        guard let pending = tab.pendingCode else { return }
+        guard Date() < pending.until, passwordVault.isRecentlyUnlocked,
+              let host = tab.url?.host(), PasswordVault.normalize(host).hasSuffix(pending.entry.server) else {
+            if Date() >= pending.until { tab.pendingCode = nil }
+            return
+        }
+        if await tab.fillOneTimeCode(pending.generator.code()) { tab.pendingCode = nil }
     }
 
     func deletePassword(_ entry: PasswordEntry) {

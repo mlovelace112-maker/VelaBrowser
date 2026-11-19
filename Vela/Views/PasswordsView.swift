@@ -80,6 +80,7 @@ struct PasswordsView: View {
             let result = try PasswordImporter.importFile(url, into: store.passwordVault)
             PasswordImporter.destroy(url)
             var message = "Imported \(result.imported) \(result.imported == 1 ? "login" : "logins")."
+            if result.codes > 0 { message += " \(result.codes) of them came with 2FA codes." }
             if result.skipped > 0 { message += " Skipped \(result.skipped) without a website or password." }
             message += " The exported file was erased and deleted."
             importMessage = message
@@ -160,6 +161,8 @@ private struct PasswordRow: View {
     @Binding var revealed: String?
     @State private var confirmDelete = false
     @State private var isHovering = false
+    @State private var isAddingCode = false
+    @State private var confirmRemoveCode = false
 
     var body: some View {
         HStack(spacing: 12) {
@@ -172,6 +175,24 @@ private struct PasswordRow: View {
                     .textSelection(.enabled)
             }
             Spacer()
+            if store.passwordVault.hasCode(entry), let generator = store.passwordVault.oneTimeCode(for: entry) {
+                Button {
+                    PasswordVault.copyToClipboard(generator.code())
+                } label: {
+                    OneTimeCodeLabel(generator: generator)
+                }
+                .buttonStyle(.plain)
+                .help("Copy the 2FA code")
+                .contextMenu {
+                    Button("Remove 2FA Code…", role: .destructive) { confirmRemoveCode = true }
+                }
+            } else {
+                Button { isAddingCode = true } label: {
+                    Image(systemName: "123.rectangle")
+                }
+                .buttonStyle(IconButtonStyle(size: 26))
+                .help("Add a 2FA code (the setup key from the website)")
+            }
             Text(revealed ?? "••••••••••")
                 .font(.system(size: 12.5, design: .monospaced))
                 .foregroundStyle(Nightglass.secondaryText)
@@ -208,6 +229,12 @@ private struct PasswordRow: View {
         .confirmationDialog("Delete the password for \(entry.server)?", isPresented: $confirmDelete) {
             Button("Delete", role: .destructive) { store.deletePassword(entry) }
         }
+        .confirmationDialog("Remove the 2FA code for \(entry.server)?", isPresented: $confirmRemoveCode) {
+            Button("Remove", role: .destructive) { store.passwordVault.removeCode(for: entry) }
+        } message: {
+            Text("Make sure you can still sign in another way (an authenticator app or backup codes) first.")
+        }
+        .sheet(isPresented: $isAddingCode) { AddOneTimeCodeView(entry: entry) }
     }
 }
 

@@ -100,6 +100,8 @@ final class BrowserTab: Identifiable {
     /// The address Vela just reloaded without tracking tags (or with the
     /// privacy signal), so it isn't reloaded twice.
     @ObservationIgnored fileprivate var reissuedURL: URL?
+    /// A 2FA code to type in once the site asks for it (after autofill).
+    @ObservationIgnored var pendingCode: PendingCode?
     /// Dangerous links you chose to open anyway.
     @ObservationIgnored fileprivate var allowedDangerousURLs: Set<URL> = []
 
@@ -362,7 +364,7 @@ final class BrowserTab: Identifiable {
     }
 
     /// Runs JavaScript in Vela's private script world (pages can't see it).
-    private func runScript(_ body: String, arguments: [String: Any]) async throws -> Any? {
+    func runScript(_ body: String, arguments: [String: Any]) async throws -> Any? {
         try await withCheckedThrowingContinuation { continuation in
             webView.callAsyncJavaScript(body, arguments: arguments, in: nil, in: .defaultClient) { result in
                 switch result {

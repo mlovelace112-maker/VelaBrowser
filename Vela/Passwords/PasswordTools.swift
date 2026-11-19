@@ -18,6 +18,8 @@ enum PasswordImporter {
     struct Result {
         var imported = 0
         var skipped = 0
+        /// 2FA keys that came along.
+        var codes = 0
     }
 
     enum ImportError: LocalizedError {
@@ -46,6 +48,8 @@ enum PasswordImporter {
             throw ImportError.missingColumns
         }
         let userColumn = column(["username", "user name", "login_username", "email", "login"])
+        // The Passwords app's 2FA keys ("otpauth://totp/…").
+        let codeColumn = column(["otpauth", "otp", "totp", "login_totp", "one-time password"])
 
         var result = Result()
         for row in rows.dropFirst() {
@@ -56,6 +60,11 @@ enum PasswordImporter {
             guard !password.isEmpty, let host = host(from: address) else { result.skipped += 1; continue }
             if vault.save(server: host, account: username, password: password) {
                 result.imported += 1
+                if let codeColumn, row.count > codeColumn,
+                   let generator = OneTimeCode(setupText: row[codeColumn]) {
+                    vault.saveCode(generator, for: PasswordEntry(server: host, account: username))
+                    result.codes += 1
+                }
             } else {
                 result.skipped += 1
             }
