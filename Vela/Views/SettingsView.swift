@@ -78,6 +78,8 @@ struct GeneralSettingsTab: View {
                     .foregroundStyle(Nightglass.mutedText)
             }
 
+            UpdatesSection()
+
             Section("Reader") {
                 Picker("Text size", selection: $reader.fontSize) {
                     ForEach([15.0, 17, 19, 21, 24], id: \.self) { size in
@@ -200,5 +202,34 @@ private struct ThemeSwatch: View {
         .buttonStyle(.plain)
         .accessibilityLabel("\(theme.name) theme")
         .accessibilityAddTraits(isSelected ? .isSelected : [])
+    }
+}
+
+/// Settings ▸ General ▸ Updates. See Updater.swift for how updates work.
+struct UpdatesSection: View {
+    var body: some View {
+        @Bindable var updater = Updater.shared
+
+        Section("Updates") {
+            LabeledContent("Version", value: updater.versionDescription)
+            if updater.isAvailable {
+                Toggle("Check for updates automatically", isOn: $updater.checksAutomatically)
+                Toggle(isOn: $updater.getsBetaUpdates) {
+                    Text("Get beta updates")
+                    Text("Try new features as soon as they're merged. Beta builds are a little less tested.")
+                }
+                HStack {
+                    Button("Check Now") { updater.checkNow() }
+                    if let last = updater.lastCheck {
+                        Text("Last checked \(last.formatted(.relative(presentation: .named)))")
+                            .foregroundStyle(Nightglass.mutedText)
+                    }
+                }
+            } else if let reason = updater.unavailableReason {
+                Text(reason)
+                    .foregroundStyle(Nightglass.mutedText)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+        }
     }
 }

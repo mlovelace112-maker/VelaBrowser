@@ -26,7 +26,31 @@ Running from Xcode is for development. To use Vela every day, build a finished c
 
 **Why the team ID matters.** macOS remembers permissions (Full Disk Access, Keychain) by the app's signature. Signed with your Apple ID team, each new build keeps the same signature, so you grant them once. Signed "locally", every rebuild looks like a new app and macOS asks again.
 
-To update later: pull the new code and run the same command.
+To update later: Vela updates itself (see below). You can still pull the new code and run the same command.
+
+## Updates: how new features reach Vela
+
+```
+feature branch ─▶ pull request ─▶ merge to main ─▶ beta build ─▶ Vela (beta on)
+   (Claude)      (Build check)                   Run "Release" ─▶ stable build ─▶ Vela (everyone)
+```
+
+1. **Every change starts on its own branch** with a pull request. GitHub's **Build** check compiles Vela on a Mac for every pull request, so build errors show up there. The built app is attached to the run for 7 days if you want to try it early.
+2. **Merging to `main` makes a beta.** The **Release** pipeline builds Vela, signs the update, puts it on the [Releases page](../../releases) as a pre-release, and adds it to the update feed (the `appcast` branch).
+3. **A stable release is one click.** Go to **Actions ▸ Release ▸ Run workflow**, keep channel **stable**, type a version like `1.1`, and run it. Release notes are made from the change list since the last stable version.
+4. **Vela checks once a day** (or Vela ▸ **Check for Updates…**). It shows what's new and installs with one click. Turn on **Get beta updates** in Settings ▸ General to get betas too.
+
+### One-time setup
+
+1. **Make the repo public.** GitHub ▸ the repo ▸ Settings ▸ General ▸ Danger Zone ▸ Change visibility. Vela downloads updates without a password, so the feed and releases must be public. Public repos also get free Mac build minutes.
+2. **Make the update signing key.** In Terminal, in the VelaBrowser folder, run `bash scripts/setup-updates.sh`. It saves the private key as the GitHub secret `SPARKLE_PRIVATE_KEY` and prints the public key. That goes into `Vela-Info.plist` (`SUPublicEDKey`); until it does, Vela doesn't look for updates.
+3. **Recommended: save your signing certificate** so macOS keeps Full Disk Access and Keychain permission across updates:
+   1. In Xcode ▸ Settings ▸ Accounts, select your Apple ID ▸ **Manage Certificates…** ▸ **+** ▸ **Apple Development** (skip if you already have one).
+   2. Open **Keychain Access** ▸ **login** ▸ **My Certificates**, right-click **Apple Development: …** ▸ **Export…**, save as `vela.p12`, and choose a password.
+   3. In Terminal: `base64 -i vela.p12 | pbcopy`, then add a repository secret named `MAC_CERT_P12` and paste. Add another named `MAC_CERT_PASSWORD` with the password. Then delete `vela.p12`.
+4. **Install the first updatable Vela** once by hand: download the newest `.dmg` from the Releases page, drag Vela to Applications, then right-click ▸ **Open** (it isn't notarized by Apple, so macOS asks once). From then on it updates itself.
+
+**How the update is kept safe.** Each update is signed with the private key, which only GitHub's secret store has. Vela checks the signature against the public key built into it, so a tampered download is rejected.
 
 ## What works today
 
@@ -145,7 +169,8 @@ The app also has a custom icon: a "V" drawn as the Vela constellation. Its sourc
 3. ✅ Privacy: pop-up blocker, ad and tracker blocking, cookie manager.
 3½. ✅ Security and looks: passwords, link checker, safe downloads, script slider, pop-under and stronger ad blocking, themes.
 4. ✅ Extras: Claude in the address bar and side panel, the Spotify player, image and video search, and animation polish.
-5. ✅ Finishing touches: Reader, live Safari bookmarks, default browser, and a packaged app. **← you are here**
+5. ✅ Finishing touches: Reader, live Safari bookmarks, default browser, and a packaged app.
+6. ✅ Update pipeline: compile checks on pull requests, beta and stable releases, and self-updates with Sparkle. **← you are here**
 
 ## How the code is organized
 

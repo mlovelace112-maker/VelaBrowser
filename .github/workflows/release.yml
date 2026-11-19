@@ -1,0 +1,203 @@
+# Release pipeline: builds Vela, signs the update, publishes it on the
+# Releases page, and adds it to the update feed that Vela checks.
+#
+# • Every merge to main  → a beta build (only reaches Vela when
+#   "Get beta updates" is on in Settings ▸ General).
+# • Actions ▸ Release ▸ Run workflow, channel "stable", version "1.1"
+#   → a stable build that reaches everyone.
+#
+# Needs one secret: SPARKLE_PRIVATE_KEY (scripts/setup-updates.sh sets it).
+# Optional: MAC_CERT_P12 + MAC_CERT_PASSWORD, your Apple Development
+# certificate, so macOS keeps Vela's permissions across updates.
+name: Release
+
+on:
+  push:
+    branches: [main]
+    paths-ignore: ["**.md", "docs/**"]
+  workflow_dispatch:
+    inputs:
+      channel:
+        description: "Who gets this build"
+        type: choice
+        options: [stable, beta]
+        default: stable
+      version:
+        description: "Version number for a stable release, like 1.1 (leave empty to use the one in Xcode)"
+        required: false
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: macos-latest
+    timeout-minutes: 45
+    env:
+      FEED_BRANCH: appcast
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Check the update key is set
+        env:
+          SPARKLE_PRIVATE_KEY: ${{ secrets.SPARKLE_PRIVATE_KEY }}
+        run: |
+          if [[ -z "$SPARKLE_PRIVATE_KEY" ]]; then
+            echo "::error::The SPARKLE_PRIVATE_KEY secret is missing. Run scripts/setup-updates.sh on your Mac once."
+            exit 1
+          fi
+
+      - name: Pick version numbers
+        id: v
+        run: |
+          CHANNEL="${{ inputs.channel || 'beta' }}"
+          BASE=$(grep -m1 -o 'MARKETING_VERSION = [0-9.]*' Vela.xcodeproj/project.pbxproj | awk '{print $3}')
+          # The build number only ever goes up, which is how the updater knows
+          # what's newer. (+1 so it's always above copies built in Xcode.)
+          BUILD=$((GITHUB_RUN_NUMBER + 1))
+          if [[ "$CHANNEL" == "stable" ]]; then
+            VERSION="${{ inputs.version }}"
+            VERSION="${VERSION:-$BASE}"
+            VERSION="${VERSION#v}"
+            if git rev-parse -q --verify "refs/tags/v$VERSION" >/dev/null; then
+              echo "::error::Vela $VERSION was already released. Pick a new version number."
+              exit 1
+            fi
+            PREVIOUS=$(git tag --list 'v*' --sort=-creatordate | grep -v -- '-beta' | head -1 || true)
+          else
+            VERSION="$BASE-beta.$BUILD"
+            PREVIOUS=$(git tag --list 'v*' --sort=-creatordate | head -1 || true)
+          fi
+          {
+            echo "channel=$CHANNEL"
+            echo "version=$VERSION"
+            echo "build=$BUILD"
+            echo "tag=v$VERSION"
+            echo "previous=$PREVIOUS"
+          } >> "$GITHUB_OUTPUT"
+          echo "Building Vela $VERSION (build $BUILD, $CHANNEL); changes since ${PREVIOUS:-the beginning}"
+
+      - name: Use the newest Xcode
+        run: |
+          XCODE=$(ls -d /Applications/Xcode_*.app | grep -iv beta | sort -V | tail -1)
+          sudo xcode-select -s "$XCODE"
+          xcodebuild -version
+
+      - name: Build Vela
+        env:
+          VERSION: ${{ steps.v.outputs.version }}
+          BUILD_NUMBER: ${{ steps.v.outputs.build }}
+        run: CI=1 scripts/package.sh
+
+      - name: Sign with your certificate
+        env:
+          MAC_CERT_P12: ${{ secrets.MAC_CERT_P12 }}
+          MAC_CERT_PASSWORD: ${{ secrets.MAC_CERT_PASSWORD }}
+          VERSION: ${{ steps.v.outputs.version }}
+        run: |
+          if [[ -z "$MAC_CERT_P12" ]]; then
+            echo "::warning::No MAC_CERT_P12 secret, so this build is signed to run locally. macOS may ask for Full Disk Access and Keychain permission again after updating."
+            exit 0
+          fi
+          KEYCHAIN="$RUNNER_TEMP/vela-signing.keychain-db"
+          KEYCHAIN_PASSWORD=$(uuidgen)
+          echo "$MAC_CERT_P12" | base64 --decode > "$RUNNER_TEMP/cert.p12"
+          security create-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN"
+          security set-keychain-settings -lut 3600 "$KEYCHAIN"
+          security unlock-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN"
+          security import "$RUNNER_TEMP/cert.p12" -P "$MAC_CERT_PASSWORD" -A -f pkcs12 -k "$KEYCHAIN"
+          rm "$RUNNER_TEMP/cert.p12"
+          security set-key-partition-list -S apple-tool:,apple: -k "$KEYCHAIN_PASSWORD" "$KEYCHAIN" >/dev/null
+          security list-keychains -d user -s "$KEYCHAIN" $(security list-keychains -d user | tr -d '"')
+          IDENTITY=$(security find-identity -p codesigning "$KEYCHAIN" | awk -F'"' '/"/{print $2; exit}')
+          scripts/sign-app.sh build/Release/Vela.app "$IDENTITY"
+          # Re-make the zip and disk image from the newly signed app.
+          rm -f "build/Vela-$VERSION.zip" "build/Vela-$VERSION.dmg"
+          ditto -c -k --keepParent build/Release/Vela.app "build/Vela-$VERSION.zip"
+          mkdir -p build/dmg && ditto build/Release/Vela.app build/dmg/Vela.app && ln -s /Applications build/dmg/Applications
+          hdiutil create -volname "Vela $VERSION" -srcfolder build/dmg -ov -format UDZO "build/Vela-$VERSION.dmg" >/dev/null
+          rm -rf build/dmg
+
+      - name: Check the app's signature
+        run: codesign --verify --deep --strict --verbose=2 build/Release/Vela.app
+
+      - name: Sign the update
+        id: sig
+        env:
+          SPARKLE_PRIVATE_KEY: ${{ secrets.SPARKLE_PRIVATE_KEY }}
+          VERSION: ${{ steps.v.outputs.version }}
+        run: |
+          SIGN_UPDATE=$(find build/SourcePackages -type f -name sign_update -path '*/bin/*' | head -1)
+          [[ -x "$SIGN_UPDATE" ]] || { echo "::error::Couldn't find Sparkle's sign_update tool"; exit 1; }
+          KEYFILE="$RUNNER_TEMP/sparkle.key"
+          printf '%s' "$SPARKLE_PRIVATE_KEY" > "$KEYFILE"
+          SIGNATURE=$("$SIGN_UPDATE" --ed-key-file "$KEYFILE" "build/Vela-$VERSION.zip")
+          rm "$KEYFILE"
+          echo "signature=$SIGNATURE" >> "$GITHUB_OUTPUT"
+
+      - name: Write release notes
+        env:
+          PREVIOUS: ${{ steps.v.outputs.previous }}
+          CHANNEL: ${{ steps.v.outputs.channel }}
+        run: |
+          RANGE="${PREVIOUS:+$PREVIOUS..}HEAD"
+          git log --no-merges --pretty='%s' $RANGE | head -40 > "$RUNNER_TEMP/changes.txt"
+          [[ -s "$RUNNER_TEMP/changes.txt" ]] || echo "Small fixes and improvements" > "$RUNNER_TEMP/changes.txt"
+          python3 - "$RUNNER_TEMP/changes.txt" "$CHANNEL" <<'PY'
+          import html, sys
+          lines = [l.strip() for l in open(sys.argv[1], encoding="utf-8") if l.strip()]
+          beta = sys.argv[2] == "beta"
+          intro = "A beta build with the newest changes." if beta else "What's new in this version:"
+          with open("build/notes.md", "w", encoding="utf-8") as f:
+              f.write(intro + "\n\n" + "".join(f"- {l}\n" for l in lines))
+          with open("build/notes.html", "w", encoding="utf-8") as f:
+              f.write(f"<p>{html.escape(intro)}</p><ul>" + "".join(f"<li>{html.escape(l)}</li>" for l in lines) + "</ul>")
+          PY
+          cat build/notes.md
+
+      - name: Publish on the Releases page
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ steps.v.outputs.tag }}
+          VERSION: ${{ steps.v.outputs.version }}
+          CHANNEL: ${{ steps.v.outputs.channel }}
+        run: |
+          FLAGS=()
+          [[ "$CHANNEL" == "beta" ]] && FLAGS+=(--prerelease)
+          gh release create "$TAG" "build/Vela-$VERSION.zip" "build/Vela-$VERSION.dmg" \
+            --target "$GITHUB_SHA" --title "Vela $VERSION" --notes-file build/notes.md "${FLAGS[@]}"
+
+      - name: Add it to the update feed
+        env:
+          TAG: ${{ steps.v.outputs.tag }}
+          VERSION: ${{ steps.v.outputs.version }}
+          BUILD: ${{ steps.v.outputs.build }}
+          CHANNEL: ${{ steps.v.outputs.channel }}
+          SIGNATURE: ${{ steps.sig.outputs.signature }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          FEED="$RUNNER_TEMP/feed"
+          if git ls-remote --exit-code --heads origin "$FEED_BRANCH" >/dev/null; then
+            git fetch origin "$FEED_BRANCH"
+            git worktree add "$FEED" "origin/$FEED_BRANCH"
+            git -C "$FEED" checkout -B "$FEED_BRANCH"
+          else
+            git worktree add --detach "$FEED"
+            git -C "$FEED" checkout --orphan "$FEED_BRANCH"
+            git -C "$FEED" rm -rfq .
+            printf '# Vela update feed\n\nThe release pipeline writes appcast.xml here. Vela reads it to find updates.\n' > "$FEED/README.md"
+          fi
+          python3 scripts/appcast.py --appcast "$FEED/appcast.xml" \
+            --version "$VERSION" --build "$BUILD" --channel "$CHANNEL" \
+            --url "https://github.com/$GITHUB_REPOSITORY/releases/download/$TAG/Vela-$VERSION.zip" \
+            --signature "$SIGNATURE" --notes build/notes.html
+          git -C "$FEED" add -A
+          git -C "$FEED" commit -qm "Add Vela $VERSION ($CHANNEL)"
+          git -C "$FEED" push origin "$FEED_BRANCH"

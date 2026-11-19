@@ -18,6 +18,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         if let icon = NSImage(named: "VelaIcon") {
             NSApp.applicationIconImage = icon
         }
+        // Start looking for new versions of Vela (see Updater.swift).
+        Updater.shared.start()
     }
 
     /// Links and web pages opened from other apps (when Vela is your default

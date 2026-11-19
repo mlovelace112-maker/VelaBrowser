@@ -8,5 +8,9 @@
 	<false/>
 	<key>com.apple.security.network.client</key>
 	<true/>
+	<!-- Builds signed "to run locally" have no team ID, so macOS would refuse
+	     to load the Sparkle updater framework into Vela without this. -->
+	<key>com.apple.security.cs.disable-library-validation</key>
+	<true/>
 </dict>
 </plist>

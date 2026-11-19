@@ -18,6 +18,15 @@
 			</array>
 		</dict>
 	</array>
+	<!-- Updates (Sparkle). The feed lists every version GitHub has built.
+	     SUPublicEDKey is filled in once by scripts/setup-updates.sh; Vela
+	     uses it to check that each download really came from your pipeline. -->
+	<key>SUFeedURL</key>
+	<string>https://raw.githubusercontent.com/mlovelace112-maker/VelaBrowser/appcast/appcast.xml</string>
+	<key>SUPublicEDKey</key>
+	<string></string>
+	<key>SUEnableAutomaticChecks</key>
+	<true/>
 	<!-- …and web pages saved on your Mac. -->
 	<key>CFBundleDocumentTypes</key>
 	<array>

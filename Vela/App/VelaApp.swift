@@ -56,6 +56,10 @@ struct BrowserCommands: Commands {
         }
 
         // Vela menu
+        CommandGroup(after: .appInfo) {
+            Button("Check for Updates…") { Updater.shared.checkNow() }
+                .disabled(!Updater.shared.isAvailable)
+        }
         CommandGroup(after: .appSettings) {
             Button("Make Vela the Default Browser") {
                 Task { await store.defaultBrowser.makeDefault() }

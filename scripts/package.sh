@@ -9,6 +9,11 @@
 #
 # Find your team ID in Xcode ▸ Settings ▸ Accounts, or in the project's
 # Signing & Capabilities tab.
+#
+# The GitHub release pipeline runs this same script, and also sets:
+#   VERSION=1.2       the version people see (default: MARKETING_VERSION in Xcode)
+#   BUILD_NUMBER=142  the number the updater compares (must always go up)
+# It also makes Vela-<version>.zip, the file the updater downloads.
 set -euo pipefail
 
 cd "$(dirname "$0")/.."
@@ -16,6 +21,10 @@ ROOT="$PWD"
 BUILD="$ROOT/build"
 INSTALL=false
 [[ "${1:-}" == "--install" ]] && INSTALL=true
+
+VERSIONING=()
+[[ -n "${VERSION:-}" ]] && VERSIONING+=(MARKETING_VERSION="$VERSION")
+[[ -n "${BUILD_NUMBER:-}" ]] && VERSIONING+=(CURRENT_PROJECT_VERSION="$BUILD_NUMBER")
 
 SIGNING=(CODE_SIGN_IDENTITY="-")
 if [[ -n "${TEAM:-}" ]]; then
@@ -27,14 +36,22 @@ fi
 
 echo "▸ Building Vela (Release)…"
 rm -rf "$BUILD"
+# On GitHub (CI is set), show the full log so build errors are easy to read.
+FILTER=(grep -E "^(\*\*|error|warning: .*Vela)")
+[[ -n "${CI:-}" ]] && FILTER=(cat)
+# Sparkle (the updater) comes from Swift Package Manager, which needs a scheme.
+# SourcePackages is kept in ./build so the release pipeline can find
+# Sparkle's signing tool there.
 xcodebuild \
   -project Vela.xcodeproj \
-  -target Vela \
+  -scheme Vela \
   -configuration Release \
+  -clonedSourcePackagesDirPath "$BUILD/SourcePackages" \
   SYMROOT="$BUILD" \
   -allowProvisioningUpdates \
   "${SIGNING[@]}" \
-  build | grep -E "^(\*\*|error|warning: .*Vela)" || true
+  ${VERSIONING[@]+"${VERSIONING[@]}"} \
+  build | "${FILTER[@]}" || true
 
 APP="$BUILD/Release/Vela.app"
 if [[ ! -d "$APP" ]]; then
@@ -44,6 +61,10 @@ fi
 
 VERSION=$(/usr/libexec/PlistBuddy -c "Print CFBundleShortVersionString" "$APP/Contents/Info.plist")
 DMG="$BUILD/Vela-$VERSION.dmg"
+
+# The updater downloads a zip ("ditto" keeps the app's signature intact).
+ZIP="$BUILD/Vela-$VERSION.zip"
+ditto -c -k --keepParent "$APP" "$ZIP"
 
 echo "▸ Making $DMG…"
 STAGING="$BUILD/dmg"
@@ -67,3 +88,4 @@ fi
 echo "✓ Done"
 echo "  App:        $APP"
 echo "  Disk image: $DMG"
+echo "  Update zip: $ZIP"
