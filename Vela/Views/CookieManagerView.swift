@@ -167,6 +167,20 @@ struct PrivacySettingsTab: View {
                 LabeledContent("Trackers and ads", value: "\(store.trackersBlockedTotal)")
                 LabeledContent("Pop-ups", value: "\(store.popupsBlockedTotal)")
             }
+            if !store.privacy.httpAllowedSites.isEmpty {
+                Section("Allowed without a secure connection") {
+                    ForEach(store.privacy.httpAllowedSites.sorted(), id: \.self) { site in
+                        HStack {
+                            Text(site)
+                            Spacer()
+                            Button("Remove") {
+                                store.updatePrivacy { $0.httpAllowedSites.remove(site) }
+                            }
+                            .controlSize(.small)
+                        }
+                    }
+                }
+            }
             if !store.privacy.signInSites.isEmpty {
                 Section("Sign-in allowed on") {
                     ForEach(store.privacy.signInSites.sorted(), id: \.self) { site in

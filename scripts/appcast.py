@@ -33,6 +33,8 @@ def main():
     p.add_argument("--notes", required=True, help="an HTML file with the release notes")
     p.add_argument("--channel", default="stable", choices=["stable", "beta"])
     p.add_argument("--min-macos", default="15.0")
+    p.add_argument("--critical", action="store_true",
+                   help="an urgent security fix: Sparkle asks to install it right away")
     a = p.parse_args()
 
     sig = re.search(r'edSignature="([^"]+)"', a.signature)
@@ -59,6 +61,10 @@ def main():
     ET.SubElement(item, s("minimumSystemVersion")).text = a.min_macos
     if a.channel == "beta":
         ET.SubElement(item, s("channel")).text = "beta"
+    if a.critical:
+        # Sparkle shows critical updates straight away, even if you skipped
+        # an earlier version, and won't let you "Skip This Version".
+        ET.SubElement(item, s("criticalUpdate"))
     with open(a.notes, encoding="utf-8") as f:
         ET.SubElement(item, "description").text = f.read()
     ET.SubElement(item, "enclosure", {
@@ -77,7 +83,7 @@ def main():
 
     ET.indent(tree, space="  ")
     tree.write(a.appcast, encoding="utf-8", xml_declaration=True)
-    print(f"✓ Added Vela {a.version} (build {a.build}, {a.channel}) to {a.appcast}")
+    print(f"✓ Added Vela {a.version} (build {a.build}, {a.channel}{', critical' if a.critical else ''}) to {a.appcast}")
 
 
 if __name__ == "__main__":

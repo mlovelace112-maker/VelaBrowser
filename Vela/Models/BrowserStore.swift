@@ -70,11 +70,13 @@ final class BrowserStore {
         config.websiteDataStore = .default()
         // Identify as Safari so websites serve their normal desktop pages.
         config.applicationNameForUserAgent = "Version/18.0 Safari/605.1.15"
+        Self.harden(config)
         configuration = config
 
         let privateConfig = WKWebViewConfiguration()
         privateConfig.websiteDataStore = .nonPersistent()
         privateConfig.applicationNameForUserAgent = config.applicationNameForUserAgent
+        Self.harden(privateConfig)
         privateConfiguration = privateConfig
 
         bookmarks = Self.loadBookmarks()
@@ -85,6 +87,33 @@ final class BrowserStore {
         newTab()
         claude.store = self
         Task { await refreshBlockingRules() }
+    }
+
+    /// Safer WebKit settings for every tab.
+    private static func harden(_ config: WKWebViewConfiguration) {
+        // Safari's own warning for known phishing and malware sites.
+        config.preferences.isFraudulentWebsiteWarningEnabled = true
+        // Go straight to https:// for sites known to support it (the HSTS list).
+        config.upgradeKnownHostsToHTTPS = true
+        // Pages can't open windows on their own; Vela's pop-up setting decides.
+        config.preferences.javaScriptCanOpenWindowsAutomatically = false
+    }
+
+    /// "Continue to Site (Not Secure)" on the HTTPS-Only warning.
+    func continueInsecure(in tab: BrowserTab) {
+        guard let url = tab.httpsWarning else { return }
+        tab.httpsWarning = nil
+        updatePrivacy { $0.httpAllowedSites.insert(Self.siteName(url)) }
+        Task {
+            await refreshBlockingRules()
+            tab.load(url)
+        }
+    }
+
+    /// "Go Back" on the HTTPS-Only warning.
+    func dismissHTTPSWarning(in tab: BrowserTab) {
+        tab.httpsWarning = nil
+        if tab.webView.url == nil { tab.url = nil }
     }
 
     var selectedTab: BrowserTab? {

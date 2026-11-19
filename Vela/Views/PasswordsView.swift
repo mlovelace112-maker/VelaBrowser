@@ -1,4 +1,6 @@
+import AppKit
 import SwiftUI
+import UniformTypeIdentifiers
 
 /// Bookmarks-style list of your saved passwords (⌥⌘P). Locked until you use
 /// Touch ID or your Mac password, and locked again when it closes.
@@ -9,6 +11,8 @@ struct PasswordsView: View {
     @State private var revealed: [String: String] = [:]
     @State private var isAdding = false
     @State private var unlockFailed = false
+    @State private var isChecking = false
+    @State private var importMessage: String?
 
     var body: some View {
         let vault = store.passwordVault
@@ -19,6 +23,10 @@ struct PasswordsView: View {
                     .font(.system(size: 20, weight: .semibold, design: .rounded))
                 Spacer()
                 if vault.isUnlocked {
+                    Button { importFromPasswordsApp() } label: { Label("Import…", systemImage: "square.and.arrow.down") }
+                        .help("Import passwords exported from the Passwords app, Chrome or Firefox")
+                    Button { isChecking = true } label: { Label("Check", systemImage: "checkmark.shield") }
+                        .help("Find weak, reused and breached passwords")
                     Button { isAdding = true } label: { Label("Add", systemImage: "plus") }
                     Button {
                         revealed = [:]
@@ -47,6 +55,37 @@ struct PasswordsView: View {
             vault.lock()
         }
         .sheet(isPresented: $isAdding) { AddPasswordView() }
+        .sheet(isPresented: $isChecking) { PasswordCheckView() }
+        .alert("Import passwords", isPresented: Binding(
+            get: { importMessage != nil },
+            set: { if !$0 { importMessage = nil } }
+        )) {
+            Button("OK") { importMessage = nil }
+        } message: {
+            Text(importMessage ?? "")
+        }
+    }
+
+    /// Passwords app ▸ File ▸ Export All Passwords… makes a .csv file. This
+    /// picks it, imports it, and then destroys the file.
+    private func importFromPasswordsApp() {
+        let panel = NSOpenPanel()
+        panel.title = "Import Passwords"
+        panel.message = "Choose the file you exported from the Passwords app (File ▸ Export All Passwords…), Chrome or Firefox. Vela deletes it after importing."
+        panel.prompt = "Import"
+        panel.allowedContentTypes = [.commaSeparatedText, .plainText]
+        panel.directoryURL = FileManager.default.urls(for: .downloadsDirectory, in: .userDomainMask).first
+        guard panel.runModal() == .OK, let url = panel.url else { return }
+        do {
+            let result = try PasswordImporter.importFile(url, into: store.passwordVault)
+            PasswordImporter.destroy(url)
+            var message = "Imported \(result.imported) \(result.imported == 1 ? "login" : "logins")."
+            if result.skipped > 0 { message += " Skipped \(result.skipped) without a website or password." }
+            message += " The exported file was erased and deleted."
+            importMessage = message
+        } catch {
+            importMessage = error.localizedDescription + " The file was left where it was."
+        }
     }
 
     private func lockedView(_ vault: PasswordVault) -> some View {
@@ -260,5 +299,85 @@ private struct PasskeyNote: View {
                 .foregroundStyle(Nightglass.mutedText)
                 .fixedSize(horizontal: false, vertical: true)
         }
+    }
+}
+
+/// Passwords ▸ Check: weak, reused and breached passwords.
+private struct PasswordCheckView: View {
+    @Environment(BrowserStore.self) private var store
+    @Environment(\.dismiss) private var dismiss
+    @State private var includeBreaches = true
+    @State private var issues: [PasswordIssue]?
+    @State private var isRunning = false
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            HStack {
+                Text("Password Check")
+                    .font(.system(size: 18, weight: .semibold, design: .rounded))
+                Spacer()
+                Button("Done") { dismiss() }
+                    .keyboardShortcut(.defaultAction)
+            }
+            Toggle(isOn: $includeBreaches) {
+                Text("Also check known data breaches")
+                Text("Sends only the first 5 characters of a scrambled code of each password to Have I Been Pwned. Your passwords never leave your Mac.")
+            }
+            .toggleStyle(.switch)
+            .tint(Nightglass.accent)
+
+            Button(isRunning ? "Checking…" : "Check My Passwords") {
+                isRunning = true
+                Task {
+                    issues = await PasswordHealth.check(store.passwordVault, includeBreaches: includeBreaches)
+                    isRunning = false
+                }
+            }
+            .buttonStyle(.borderedProminent)
+            .tint(Nightglass.accent)
+            .disabled(isRunning)
+
+            if let issues {
+                if issues.isEmpty {
+                    Label("No problems found. Nice work.", systemImage: "checkmark.seal.fill")
+                        .foregroundStyle(Nightglass.safe)
+                } else {
+                    Text("\(issues.count) \(issues.count == 1 ? "login needs" : "logins need") attention. Change these passwords on their websites, then save the new ones.")
+                        .font(.system(size: 12.5))
+                        .foregroundStyle(Nightglass.mutedText)
+                    ScrollView {
+                        LazyVStack(alignment: .leading, spacing: 8) {
+                            ForEach(issues) { issue in
+                                VStack(alignment: .leading, spacing: 3) {
+                                    Text(issue.entry.server).font(.system(size: 13, weight: .semibold))
+                                    if !issue.entry.account.isEmpty {
+                                        Text(issue.entry.account)
+                                            .font(.system(size: 12))
+                                            .foregroundStyle(Nightglass.secondaryText)
+                                    }
+                                    HStack(spacing: 6) {
+                                        ForEach(issue.kinds, id: \.self) { kind in
+                                            Text(kind.rawValue)
+                                                .font(.system(size: 11, weight: .medium))
+                                                .padding(.horizontal, 7)
+                                                .padding(.vertical, 2)
+                                                .background(Capsule().fill((kind == .breached ? Nightglass.danger : Nightglass.caution).opacity(0.2)))
+                                                .foregroundStyle(kind == .breached ? Nightglass.danger : Nightglass.caution)
+                                        }
+                                    }
+                                }
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                                .padding(10)
+                                .background(RoundedRectangle(cornerRadius: 10, style: .continuous).fill(Color.white.opacity(0.04)))
+                            }
+                        }
+                    }
+                }
+            }
+            Spacer(minLength: 0)
+        }
+        .padding(22)
+        .frame(width: 520, height: 480)
+        .background(Nightglass.background)
     }
 }

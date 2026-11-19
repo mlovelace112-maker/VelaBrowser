@@ -20,6 +20,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
         // Start looking for new versions of Vela (see Updater.swift).
         Updater.shared.start()
+        // Remind about waiting macOS security updates (WebKit gets its fixes there).
+        Task { @MainActor in
+            if let update = await Updater.shared.checkMacOSUpdates() {
+                self.store.showNotice("macOS update available: \(update). It includes web security fixes.")
+            }
+        }
     }
 
     /// Links and web pages opened from other apps (when Vela is your default

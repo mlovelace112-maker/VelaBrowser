@@ -37,6 +37,8 @@ final class BrowserTab: Identifiable {
     var linkWarning: LinkWarning?
     /// Saved logins for this page's website (they make the key button appear).
     var savedLogins: [PasswordEntry] = []
+    /// Set when a site has no secure (https) version: the "Not Secure" warning.
+    var httpsWarning: URL?
     /// Shows the list of saved logins under the key button.
     var isLoginPickerShown = false
     /// Set once Vela has filled (or tried to fill) a login on this page, so
@@ -80,6 +82,8 @@ final class BrowserTab: Identifiable {
 
     /// The frame (page or embedded frame) that holds the login form.
     @ObservationIgnored fileprivate var loginFrame: WKFrameInfo?
+    /// The http:// address Vela switched to https://, until that loads or fails.
+    @ObservationIgnored fileprivate var upgradedFrom: URL?
     /// Dangerous links you chose to open anyway.
     @ObservationIgnored fileprivate var allowedDangerousURLs: Set<URL> = []
 
@@ -336,6 +340,35 @@ final class TabCoordinator: NSObject, WKNavigationDelegate, WKUIDelegate, WKScri
 
         let isMainFrame = navigationAction.targetFrame?.isMainFrame ?? true
         let pageURL = isMainFrame ? navigationAction.request.url : webView.url
+
+        // Hardening: a web page may never open files on your Mac (file://).
+        // Files you open yourself from Finder still work, because those
+        // don't come from a web page. (sourceFrame can be missing for pages
+        // you typed, so it's read carefully.)
+        if navigationAction.request.url?.isFileURL == true,
+           let source = navigationAction.value(forKey: "sourceFrame") as? WKFrameInfo,
+           ["http", "https"].contains(source.request.url?.scheme?.lowercased() ?? "") {
+            return (.cancel, preferences)
+        }
+
+        // HTTPS-Only: try the secure version of an http:// address first.
+        // If that fails, show "Not Secure" and let you decide.
+        if isMainFrame, settings.httpsOnly, let url = navigationAction.request.url,
+           url.scheme?.lowercased() == "http", let host = url.host(), !HTTPSOnly.isLocal(host),
+           !settings.httpAllowedSites.contains(BrowserStore.siteName(url)) {
+            if tab.upgradedFrom == url {
+                // The secure version already failed: ask.
+                tab.upgradedFrom = nil
+                tab.httpsWarning = url
+                return (.cancel, preferences)
+            }
+            if let secure = HTTPSOnly.secureVersion(of: url) {
+                tab.upgradedFrom = url
+                tab.httpsWarning = nil
+                Task { @MainActor in webView.load(URLRequest(url: secure)) }
+                return (.cancel, preferences)
+            }
+        }
         let site = pageURL.map(BrowserStore.siteName)
         preferences.allowsContentJavaScript = settings.scriptLevel(for: site) != .blockAll
 
@@ -387,7 +420,20 @@ final class TabCoordinator: NSObject, WKNavigationDelegate, WKUIDelegate, WKScri
     }
 
     func webView(_ webView: WKWebView, didCommit navigation: WKNavigation!) {
+        tab?.upgradedFrom = nil
         tab?.resetPageStats()
+    }
+
+    /// A page failed before anything appeared. If it was the secure version
+    /// Vela tried for an http:// address, show the "Not Secure" warning.
+    func webView(_ webView: WKWebView, didFailProvisionalNavigation navigation: WKNavigation!, withError error: Error) {
+        guard let tab, let original = tab.upgradedFrom else { return }
+        let error = error as NSError
+        if error.domain == NSURLErrorDomain && error.code == NSURLErrorCancelled { return }
+        guard let failed = error.userInfo[NSURLErrorFailingURLErrorKey] as? URL,
+              failed.scheme?.lowercased() == "https", failed.host() == original.host() else { return }
+        tab.upgradedFrom = nil
+        tab.httpsWarning = original
     }
 
     func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
@@ -424,7 +470,7 @@ final class TabCoordinator: NSObject, WKNavigationDelegate, WKUIDelegate, WKScri
         switch type {
         case "hover":
             guard frame.isMainFrame, tab.settings().linkCheckerEnabled else { return }
-            let address = body["url"] as? String ?? ""
+            let address = String((body["url"] as? String ?? "").prefix(4096))
             tab.hoveredLink = address.isEmpty ? nil : URL(string: address)
         case "loginForm":
             guard isSecure else { return }
@@ -440,7 +486,8 @@ final class TabCoordinator: NSObject, WKNavigationDelegate, WKUIDelegate, WKScri
         case "credentials":
             guard isSecure,
                   let username = body["username"] as? String,
-                  let password = body["password"] as? String else { return }
+                  let password = body["password"] as? String,
+                  username.count <= 512, password.count <= 1024 else { return }
             tab.onLoginSubmitted?(origin.host, username, password)
         default:
             break
@@ -465,5 +512,31 @@ final class WeakScriptMessageHandler: NSObject, WKScriptMessageHandler {
 
     func userContentController(_ userContentController: WKUserContentController, didReceive message: WKScriptMessage) {
         target?.userContentController(userContentController, didReceive: message)
+    }
+}
+
+/// HTTPS-Only mode helpers.
+enum HTTPSOnly {
+    /// Addresses on your own Mac or home network often have no https
+    /// version, so they're left alone.
+    static func isLocal(_ host: String) -> Bool {
+        let host = host.lowercased()
+        if host == "localhost" || host.hasSuffix(".local") || host.hasSuffix(".localhost") || !host.contains(".") {
+            return true
+        }
+        let parts = host.split(separator: ".").compactMap { Int($0) }
+        guard parts.count == 4 else { return false }
+        switch (parts[0], parts[1]) {
+        case (10, _), (127, _), (192, 168), (169, 254): return true
+        case (172, 16...31): return true
+        default: return false
+        }
+    }
+
+    static func secureVersion(of url: URL) -> URL? {
+        guard var components = URLComponents(url: url, resolvingAgainstBaseURL: false) else { return nil }
+        components.scheme = "https"
+        if components.port == 80 { components.port = nil }
+        return components.url
     }
 }

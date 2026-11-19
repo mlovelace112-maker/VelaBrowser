@@ -184,6 +184,12 @@ struct PrivacyControls: View {
             SettingRow("Upgrade connections to HTTPS") {
                 Toggle("Upgrade connections to HTTPS", isOn: store.privacyBinding(\.upgradeToHTTPS))
             }
+            SettingRow("Warn before insecure sites") {
+                Toggle("Warn before insecure sites", isOn: store.privacyBinding(\.httpsOnly))
+            }
+            SettingRow("Block websites from my home network") {
+                Toggle("Block websites from my home network", isOn: store.privacyBinding(\.blockLocalNetworkAccess))
+            }
         }
         .toggleStyle(.switch)
         .tint(Nightglass.accent)

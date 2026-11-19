@@ -118,12 +118,17 @@ enum ContentBlocker {
             }
         }
 
-        // 6. Upgrade insecure http:// requests to https://.
+        // 6. Upgrade insecure http:// requests to https://. This also stops
+        //    "mixed content": a secure page quietly loading pictures or
+        //    scripts over an insecure connection. (WebKit itself blocks
+        //    insecure scripts on secure pages.) Sites where you chose
+        //    "Continue to Site (Not Secure)" are left alone.
         if settings.upgradeToHTTPS {
-            rules.append([
-                "trigger": ["url-filter": "^http://"],
-                "action": ["type": "make-https"],
-            ])
+            var trigger: [String: Any] = ["url-filter": "^http://"]
+            if !settings.httpAllowedSites.isEmpty {
+                trigger["unless-top-url"] = settings.httpAllowedSites.sorted().map(urlPattern(for:))
+            }
+            rules.append(["trigger": trigger, "action": ["type": "make-https"]])
         }
 
         // 7. Sites where you turned the shield off: "ignore all the rules above".
@@ -161,8 +166,37 @@ enum ContentBlocker {
                 rules.append(["trigger": scriptTrigger, "action": ["type": "block"]])
             }
         }
+
+        // 9. Local network protection. A public website shouldn't be able to
+        //    talk to your router, printer or an app running on your Mac (a
+        //    trick used to change router settings or probe your home network).
+        //    Pages that are themselves on your network still can. This comes
+        //    last, so turning the shield off for a site doesn't undo it.
+        if settings.blockLocalNetworkAccess {
+            for pattern in localNetworkPatterns {
+                rules.append([
+                    "trigger": ["url-filter": pattern, "unless-top-url": localNetworkPatterns] as [String: Any],
+                    "action": ["type": "block"],
+                ])
+            }
+        }
         return rules
     }
+
+    /// Addresses on your own Mac or home network. WebKit's patterns don't
+    /// support "this|that", so each range is its own pattern.
+    static let localNetworkPatterns: [String] = [
+        "^[a-z]+://localhost[:/]",
+        "^[a-z]+://127\\.",
+        "^[a-z]+://0\\.0\\.0\\.0[:/]",
+        "^[a-z]+://10\\.",
+        "^[a-z]+://192\\.168\\.",
+        "^[a-z]+://169\\.254\\.",
+        "^[a-z]+://172\\.1[6-9]\\.",
+        "^[a-z]+://172\\.2[0-9]\\.",
+        "^[a-z]+://172\\.3[01]\\.",
+        "^[a-z]+://[^/:]+\\.local[:/]",
+    ]
 
     /// A rule that hides page elements matching these CSS selectors.
     private static func hide(_ selectors: [String]) -> [String: Any] {

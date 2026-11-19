@@ -112,6 +112,56 @@ struct LinkWarningView: View {
     }
 }
 
+/// HTTPS-Only: shown when a site has no secure version.
+struct HTTPSWarningView: View {
+    @Environment(BrowserStore.self) private var store
+    let tab: BrowserTab
+    let url: URL
+
+    var body: some View {
+        ZStack {
+            NightglassBackdrop()
+            RadialGradient(
+                colors: [Nightglass.caution.opacity(0.2), .clear],
+                center: .top, startRadius: 0, endRadius: 520
+            )
+            VStack(alignment: .leading, spacing: 16) {
+                Image(systemName: "lock.open.trianglebadge.exclamationmark")
+                    .font(.system(size: 32, weight: .semibold))
+                    .foregroundStyle(Nightglass.caution)
+                    .accessibilityHidden(true)
+                Text("This site doesn't offer a secure connection")
+                    .font(.system(size: 22, weight: .semibold, design: .rounded))
+                Text(url.host() ?? url.absoluteString)
+                    .font(.system(size: 13, design: .monospaced))
+                    .foregroundStyle(Nightglass.secondaryText)
+                    .textSelection(.enabled)
+                Text("Vela tried the secure (https) version first, and it didn't work. On an insecure connection, people on the same Wi-Fi or your internet provider can see or change what you send and receive. Don't type passwords or card numbers here.")
+                    .font(.system(size: 13))
+                    .foregroundStyle(Nightglass.text)
+                    .fixedSize(horizontal: false, vertical: true)
+                HStack(spacing: 12) {
+                    Button("Go Back") { store.dismissHTTPSWarning(in: tab) }
+                        .buttonStyle(.borderedProminent)
+                        .tint(Nightglass.accent)
+                        .keyboardShortcut(.defaultAction)
+                    Button("Continue to Site (Not Secure)") { store.continueInsecure(in: tab) }
+                        .buttonStyle(.plain)
+                        .foregroundStyle(Nightglass.caution)
+                }
+                .padding(.top, 4)
+                Text("Vela remembers this choice for the site. Undo it in Settings ▸ Privacy.")
+                    .font(.system(size: 11.5))
+                    .foregroundStyle(Nightglass.mutedText)
+            }
+            .padding(28)
+            .frame(maxWidth: 520, alignment: .leading)
+            .glassPanel(cornerRadius: 18)
+            .shadow(color: .black.opacity(0.5), radius: 30, y: 12)
+        }
+    }
+}
+
 // MARK: - Downloads
 
 /// The toolbar's downloads button, with a ring that fills as files download.
