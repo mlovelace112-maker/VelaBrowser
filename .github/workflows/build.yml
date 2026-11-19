@@ -1,0 +1,35 @@
+# Compile check: builds Vela on one of GitHub's Macs for every pull request,
+# so build errors show up on the pull request instead of on your Mac.
+# The finished app is attached to the run (Summary ▸ Artifacts) for 7 days.
+name: Build
+
+on:
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: build-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: macos-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Use the newest Xcode
+        run: |
+          XCODE=$(ls -d /Applications/Xcode_*.app | grep -iv beta | sort -V | tail -1)
+          sudo xcode-select -s "$XCODE"
+          xcodebuild -version
+
+      - name: Build Vela
+        run: CI=1 BUILD_NUMBER=1 scripts/package.sh
+
+      - name: Attach the app
+        uses: actions/upload-artifact@v4
+        with:
+          name: Vela-pr-${{ github.event.pull_request.number || github.run_number }}
+          path: build/*.zip
+          retention-days: 7

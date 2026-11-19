@@ -1,0 +1,48 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<!-- Tells macOS that Vela can open web links, so it appears in
+	     System Settings ▸ Desktop & Dock ▸ Default web browser. -->
+	<key>CFBundleURLTypes</key>
+	<array>
+		<dict>
+			<key>CFBundleURLName</key>
+			<string>Web site URL</string>
+			<key>CFBundleTypeRole</key>
+			<string>Viewer</string>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>http</string>
+				<string>https</string>
+			</array>
+		</dict>
+	</array>
+	<!-- Updates (Sparkle). The feed lists every version GitHub has built.
+	     SUPublicEDKey is the public half of the update key made by
+	     scripts/setup-updates.sh; Vela uses it to check that each download really came from your pipeline. -->
+	<key>SUFeedURL</key>
+	<string>https://raw.githubusercontent.com/mlovelace112-maker/VelaBrowser/appcast/appcast.xml</string>
+	<key>SUPublicEDKey</key>
+	<string>8a9zmPRkpmBPzpUi6HzNrZgViBCo/EF7q/C3F9FW1Qs=</string>
+	<key>SUEnableAutomaticChecks</key>
+	<true/>
+	<!-- …and web pages saved on your Mac. -->
+	<key>CFBundleDocumentTypes</key>
+	<array>
+		<dict>
+			<key>CFBundleTypeName</key>
+			<string>Web page</string>
+			<key>CFBundleTypeRole</key>
+			<string>Viewer</string>
+			<key>LSHandlerRank</key>
+			<string>Default</string>
+			<key>LSItemContentTypes</key>
+			<array>
+				<string>public.html</string>
+				<string>public.xhtml</string>
+			</array>
+		</dict>
+	</array>
+</dict>
+</plist>
