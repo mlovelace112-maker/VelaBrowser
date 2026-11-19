@@ -44,10 +44,7 @@ feature branch ─▶ pull request ─▶ merge to main ─▶ beta build ─▶
 
 1. **Make the repo public.** GitHub ▸ the repo ▸ Settings ▸ General ▸ Danger Zone ▸ Change visibility. Vela downloads updates without a password, so the feed and releases must be public. Public repos also get free Mac build minutes.
 2. **Make the update signing key.** In Terminal, in the VelaBrowser folder, run `bash scripts/setup-updates.sh`. It saves the private key as the GitHub secret `SPARKLE_PRIVATE_KEY` and prints the public key. That goes into `Vela-Info.plist` (`SUPublicEDKey`); until it does, Vela doesn't look for updates.
-3. **Recommended: save your signing certificate** so macOS keeps Full Disk Access and Keychain permission across updates:
-   1. In Xcode ▸ Settings ▸ Accounts, select your Apple ID ▸ **Manage Certificates…** ▸ **+** ▸ **Apple Development** (skip if you already have one).
-   2. Open **Keychain Access** ▸ **login** ▸ **My Certificates**, right-click **Apple Development: …** ▸ **Export…**, save as `vela.p12`, and choose a password.
-   3. In Terminal: `base64 -i vela.p12 | pbcopy`, then add a repository secret named `MAC_CERT_P12` and paste. Add another named `MAC_CERT_PASSWORD` with the password. Then delete `vela.p12`.
+3. **Recommended: save your signing certificate** so macOS keeps Full Disk Access and Keychain permission across updates. Run `bash scripts/setup-certificate.sh`. It finds your Apple Development certificate (or tells you how to make one in Xcode, for free), exports it with a random password, and saves both as the secrets `MAC_CERT_P12` and `MAC_CERT_PASSWORD`.
 4. **Install the first updatable Vela** once by hand: download the newest `.dmg` from the Releases page, drag Vela to Applications, then right-click ▸ **Open** (it isn't notarized by Apple, so macOS asks once). From then on it updates itself.
 
 **How the update is kept safe.** Each update is signed with the private key, which only GitHub's secret store has. Vela checks the signature against the public key built into it, so a tampered download is rejected.
