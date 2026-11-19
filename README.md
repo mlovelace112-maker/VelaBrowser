@@ -47,6 +47,22 @@ feature branch ─▶ pull request ─▶ merge to main ─▶ beta build ─▶
 3. **Recommended: save your signing certificate** so macOS keeps Full Disk Access and Keychain permission across updates. Run `bash scripts/setup-certificate.sh`. It finds your Apple Development certificate (or tells you how to make one in Xcode, for free), exports it with a random password, and saves both as the secrets `MAC_CERT_P12` and `MAC_CERT_PASSWORD`.
 4. **Install the first updatable Vela** once by hand: download the newest `.dmg` from the Releases page, drag Vela to Applications, then right-click ▸ **Open** (it isn't notarized by Apple, so macOS asks once). From then on it updates itself.
 
+### Repository security settings
+
+The repo is public, so its settings protect the releases. Run `bash scripts/secure-repo.sh` once (it needs the GitHub tool: `brew install gh && gh auth login`). It turns on:
+
+| Setting | What it protects |
+|---|---|
+| Secret scanning and push protection | Stops a key or password from being committed by accident. |
+| Dependabot alerts and security fixes | Warns about, and proposes fixes for, vulnerable build tools. |
+| Private vulnerability reporting | Lets people report a security problem privately instead of in public. |
+| Immutable releases | A published release's files can't be swapped out afterwards. |
+| Read-only workflows by default, only GitHub-made and verified actions | A workflow can't change the repo unless it says so, and unknown third-party actions can't run. |
+| Approval for strangers' pull requests | Code from someone else's fork doesn't run on GitHub's Macs until you approve it. |
+| Rulesets | `main` changes only through pull requests that pass the Build check. The `appcast` update feed and `v…` release tags can't be force-pushed, moved or deleted. |
+
+If a step fails, make the same change by hand in the repo's **Settings**: Code security (the first four), Actions ▸ General (workflows and approvals), and Rules ▸ Rulesets (protection).
+
 **How the update is kept safe.** Each update is signed with the private key, which only GitHub's secret store has. Vela checks the signature against the public key built into it, so a tampered download is rejected.
 
 ## What works today

@@ -7,6 +7,10 @@ on:
   pull_request:
   workflow_dispatch:
 
+# Pull requests (including ones from strangers' forks) can only read the code.
+permissions:
+  contents: read
+
 concurrency:
   group: build-${{ github.ref }}
   cancel-in-progress: true
@@ -16,7 +20,9 @@ jobs:
     runs-on: macos-latest
     timeout-minutes: 40
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+        with:
+          persist-credentials: false
 
       - name: Use the newest Xcode
         run: |
@@ -28,7 +34,7 @@ jobs:
         run: CI=1 BUILD_NUMBER=1 scripts/package.sh
 
       - name: Attach the app
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: Vela-pr-${{ github.event.pull_request.number || github.run_number }}
           path: build/*.zip

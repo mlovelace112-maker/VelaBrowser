@@ -1,0 +1,9 @@
+# Dependabot opens a pull request when one of the GitHub Actions our
+# workflows use gets an update. Security fixes come right away; regular
+# updates are checked once a week.
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly

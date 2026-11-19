@@ -40,7 +40,7 @@ jobs:
     env:
       FEED_BRANCH: appcast
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
         with:
           fetch-depth: 0
 
@@ -161,6 +161,14 @@ jobs:
           PY
           cat build/notes.md
 
+      - name: Write checksums
+        env:
+          VERSION: ${{ steps.v.outputs.version }}
+        run: |
+          cd build
+          shasum -a 256 "Vela-$VERSION.zip" "Vela-$VERSION.dmg" > "Vela-$VERSION-SHA256.txt"
+          cat "Vela-$VERSION-SHA256.txt"
+
       - name: Publish on the Releases page
         env:
           GH_TOKEN: ${{ github.token }}
@@ -170,7 +178,7 @@ jobs:
         run: |
           FLAGS=()
           [[ "$CHANNEL" == "beta" ]] && FLAGS+=(--prerelease)
-          gh release create "$TAG" "build/Vela-$VERSION.zip" "build/Vela-$VERSION.dmg" \
+          gh release create "$TAG" "build/Vela-$VERSION.zip" "build/Vela-$VERSION.dmg" "build/Vela-$VERSION-SHA256.txt" \
             --target "$GITHUB_SHA" --title "Vela $VERSION" --notes-file build/notes.md "${FLAGS[@]}"
 
       - name: Add it to the update feed
