@@ -811,6 +811,25 @@ final class BrowserStore {
     }
 
     /// Whether "Allow Sign-In" is on for the tab's website.
+    /// Whether this tab's website runs in Lockdown Mode.
+    func isLockedDown(_ tab: BrowserTab) -> Bool {
+        guard let url = tab.url else { return false }
+        return privacy.lockdownSites.contains(Self.siteName(url))
+    }
+
+    /// Turns Lockdown Mode on or off for the tab's website, then reloads it.
+    func toggleLockdown(for tab: BrowserTab) {
+        guard let url = tab.url else { return }
+        let site = Self.siteName(url)
+        updatePrivacy(reloading: tab) { settings in
+            if settings.lockdownSites.contains(site) {
+                settings.lockdownSites.remove(site)
+            } else {
+                settings.lockdownSites.insert(site)
+            }
+        }
+    }
+
     func allowsSignIn(for tab: BrowserTab) -> Bool {
         guard let url = tab.url else { return false }
         return privacy.signInSites.contains(Self.siteName(url))

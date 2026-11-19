@@ -66,6 +66,7 @@ extension PrivacySettings {
         sites.formUnion(httpAllowedSites)
         sites.formUnion(keptSites)
         sites.formUnion(neverSavePasswordSites)
+        sites.formUnion(lockdownSites)
         return sites.sorted()
     }
 
@@ -80,5 +81,6 @@ extension PrivacySettings {
         httpAllowedSites.remove(site)
         keptSites.remove(site)
         neverSavePasswordSites.remove(site)
+        lockdownSites.remove(site)
     }
 }

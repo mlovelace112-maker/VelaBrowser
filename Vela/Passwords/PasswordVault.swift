@@ -43,8 +43,27 @@ final class PasswordVault {
     private static let itemKind = "Vela Password"
     private static let unlockDuration: TimeInterval = 10 * 60
 
+    @ObservationIgnored private var sleepWatchers: [NSObjectProtocol] = []
+
     init() {
         reload()
+        watchForSleep()
+    }
+
+    /// Locks again the moment your Mac sleeps, its screen turns off or locks,
+    /// or you switch to another user, so nobody who walks up can fill or
+    /// view your passwords without Touch ID.
+    private func watchForSleep() {
+        let lockNow: @Sendable (Notification) -> Void = { [weak self] _ in
+            Task { @MainActor in self?.lock() }
+        }
+        let workspace = NSWorkspace.shared.notificationCenter
+        for name in [NSWorkspace.willSleepNotification, NSWorkspace.screensDidSleepNotification, NSWorkspace.sessionDidResignActiveNotification] {
+            sleepWatchers.append(workspace.addObserver(forName: name, object: nil, queue: .main, using: lockNow))
+        }
+        sleepWatchers.append(DistributedNotificationCenter.default().addObserver(
+            forName: Notification.Name("com.apple.screenIsLocked"), object: nil, queue: .main, using: lockNow
+        ))
     }
 
     /// "WWW.Example.com" → "example.com"

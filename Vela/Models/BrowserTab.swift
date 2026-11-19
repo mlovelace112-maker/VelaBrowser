@@ -97,6 +97,9 @@ final class BrowserTab: Identifiable {
     @ObservationIgnored fileprivate var loginFrame: WKFrameInfo?
     /// The http:// address Vela switched to https://, until that loads or fails.
     @ObservationIgnored fileprivate var upgradedFrom: URL?
+    /// The address Vela just reloaded without tracking tags (or with the
+    /// privacy signal), so it isn't reloaded twice.
+    @ObservationIgnored fileprivate var reissuedURL: URL?
     /// Dangerous links you chose to open anyway.
     @ObservationIgnored fileprivate var allowedDangerousURLs: Set<URL> = []
 
@@ -182,7 +185,9 @@ final class BrowserTab: Identifiable {
             // A saved web page from your Mac (opened from Finder).
             webView.loadFileURL(url, allowingReadAccessTo: url.deletingLastPathComponent())
         } else {
-            webView.load(URLRequest(url: url))
+            var request = URLRequest(url: url)
+            if settings().globalPrivacyControl { request.setValue("1", forHTTPHeaderField: GlobalPrivacyControl.header) }
+            webView.load(request)
         }
     }
 
@@ -207,6 +212,12 @@ final class BrowserTab: Identifiable {
         contentController.addUserScript(PasswordScripts.loginScript())
         if privacy.fingerprintProtection {
             contentController.addUserScript(Fingerprinting.script(shieldsDownSites: privacy.shieldsDownSites))
+        }
+        if privacy.globalPrivacyControl {
+            contentController.addUserScript(GlobalPrivacyControl.script())
+        }
+        if privacy.dismissCookieBanners {
+            contentController.addUserScript(CookieBanners.script(shieldsDownSites: privacy.shieldsDownSites))
         }
     }
 
@@ -520,8 +531,38 @@ final class TabCoordinator: NSObject, WKNavigationDelegate, WKUIDelegate, WKScri
                 return (.cancel, preferences)
             }
         }
+        // Tracking tags and Global Privacy Control: load a clean address,
+        // with the "don't sell my data" header, instead.
+        if isMainFrame, let url = navigationAction.request.url,
+           (navigationAction.request.httpMethod ?? "GET").uppercased() == "GET",
+           ["http", "https"].contains(url.scheme?.lowercased() ?? ""),
+           navigationAction.navigationType != .backForward, navigationAction.navigationType != .reload,
+           !settings.shieldsDownSites.contains(BrowserStore.siteName(url)),
+           tab.reissuedURL != url,
+           // A "#section" link on the same page must not reload it.
+           url.withoutFragment != webView.url?.withoutFragment {
+            let cleaned = settings.stripTrackingParameters ? TrackingParameters.clean(url) : nil
+            // Link clicks to another site don't carry the header on their own.
+            let needsSignal = settings.globalPrivacyControl
+                && navigationAction.navigationType == .linkActivated
+                && navigationAction.request.value(forHTTPHeaderField: GlobalPrivacyControl.header) == nil
+                && url.host() != webView.url?.host()
+            let target = cleaned ?? url
+            // If a site insists on its tags (it redirects straight back to
+            // them), let it be rather than loop.
+            if cleaned != nil || needsSignal, target != tab.reissuedURL {
+                var request = URLRequest(url: target)
+                if settings.globalPrivacyControl { request.setValue("1", forHTTPHeaderField: GlobalPrivacyControl.header) }
+                tab.reissuedURL = target
+                Task { @MainActor in webView.load(request) }
+                return (.cancel, preferences)
+            }
+        }
+
         let site = pageURL.map(BrowserStore.siteName)
         preferences.allowsContentJavaScript = settings.scriptLevel(for: site) != .blockAll
+        // Lockdown Mode for sites you've chosen (Site Settings or the shield).
+        preferences.isLockdownModeEnabled = site.map { settings.lockdownSites.contains($0) } ?? false
 
         if isMainFrame, let url = navigationAction.request.url {
             let isRevisit = navigationAction.navigationType == .backForward || navigationAction.navigationType == .reload
@@ -572,6 +613,7 @@ final class TabCoordinator: NSObject, WKNavigationDelegate, WKUIDelegate, WKScri
 
     func webView(_ webView: WKWebView, didCommit navigation: WKNavigation!) {
         tab?.upgradedFrom = nil
+        tab?.reissuedURL = nil
         tab?.resetPageStats()
         // Pop-ups: your per-site choice (Site Settings) or the global switch.
         if let tab {
