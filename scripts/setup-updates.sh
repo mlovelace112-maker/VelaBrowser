@@ -63,4 +63,4 @@ echo "    $PUBLIC_KEY"
 echo
 echo "Optional, but recommended: also save your Apple Development certificate as"
 echo "a secret, so macOS keeps Full Disk Access and Keychain permission after"
-echo "each update. See \"Updates\" in the README for the steps."
+echo "each update: run  bash scripts/setup-certificate.sh"
