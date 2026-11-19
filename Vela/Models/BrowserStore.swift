@@ -998,11 +998,16 @@ final class BrowserStore {
         }
     }
 
+    /// "login.example.com" counts as example.com, but "evilexample.com" doesn't.
+    static func isSameSite(_ host: String, as site: String) -> Bool {
+        host == site || host.hasSuffix("." + site)
+    }
+
     /// Types a waiting 2FA code into the page, if it has a code box.
     func fillPendingCode(in tab: BrowserTab) async {
         guard let pending = tab.pendingCode else { return }
         guard Date() < pending.until, passwordVault.isRecentlyUnlocked,
-              let host = tab.url?.host(), PasswordVault.normalize(host).hasSuffix(pending.entry.server) else {
+              let host = tab.url?.host(), Self.isSameSite(PasswordVault.normalize(host), as: pending.entry.server) else {
             if Date() >= pending.until { tab.pendingCode = nil }
             return
         }

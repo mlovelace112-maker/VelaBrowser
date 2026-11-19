@@ -25,6 +25,7 @@ struct VerticalTabsView: View {
                         switch item {
                         case .group(let group):
                             GroupChip(group: group)
+                                .frame(maxWidth: 206, alignment: .leading)
                                 .padding(.top, 6)
                         case .tab(let tab) where !tab.isPinned:
                             TabChip(tab: tab, isVertical: true)
@@ -64,6 +65,7 @@ struct VerticalTabsView: View {
         }
         .padding(10)
         .frame(width: 230)
+        .clipped() // nothing inside may push the list off the window's edge
         .background(VisualEffectBackground())
         .overlay(alignment: .trailing) {
             Rectangle().fill(Nightglass.stroke).frame(width: 1)
