@@ -1,3 +1,4 @@
+import AppKit
 import SwiftUI
 
 extension BrowserStore {
@@ -55,12 +56,17 @@ struct ShieldPopover: View {
     @Environment(\.dismiss) private var dismiss
     let tab: BrowserTab
     @State private var showTrackers = false
+    /// How tall the scrolling part wants to be (measured), so the panel is
+    /// only as tall as it needs and scrolls only when it must.
+    @State private var contentHeight: CGFloat = 420
 
     var body: some View {
         let site = tab.url.map(BrowserStore.siteName) ?? "New Tab"
         let isUp = store.shieldsUp(for: tab)
 
-        VStack(alignment: .leading, spacing: 16) {
+        VStack(alignment: .leading, spacing: 0) {
+            // The top line stays put; everything below it scrolls when the
+            // panel is taller than the screen has room for.
             HStack(spacing: 12) {
                 Image(systemName: isUp ? "checkmark.shield.fill" : "shield.slash")
                     .font(.system(size: 18, weight: .semibold))
@@ -89,89 +95,103 @@ struct ShieldPopover: View {
                 .tint(Nightglass.accent)
                 .disabled(tab.url == nil)
             }
-
-            HStack(spacing: 8) {
-                StatTile(value: tab.trackersFound.count, label: "Trackers", color: Nightglass.accent)
-                StatTile(value: tab.popupsBlocked.count, label: "Pop-ups", color: Nightglass.claude)
-                StatTile(value: store.trackersBlockedTotal, label: "All time", color: Nightglass.spotify)
-            }
-
-            if !tab.trackersFound.isEmpty {
-                DisclosureGroup("Blocked on this page", isExpanded: $showTrackers) {
-                    VStack(alignment: .leading, spacing: 4) {
-                        ForEach(tab.trackersFound, id: \.self) { domain in
-                            Text(domain)
-                                .font(.system(size: 12, design: .monospaced))
-                                .foregroundStyle(Nightglass.secondaryText)
-                        }
-                    }
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .padding(.top, 6)
-                }
-                .font(.system(size: 12.5, weight: .medium))
-            }
-
-            if tab.url != nil {
-                VStack(alignment: .leading, spacing: 8) {
-                    Text("JavaScript on \(site)")
-                        .font(.system(size: 12.5, weight: .medium))
-                    ScriptSlider(level: Binding(
-                        get: { store.scriptLevel(for: tab) },
-                        set: { store.setScriptLevel($0, for: tab) }
-                    ))
-                }
-            }
-
-            if tab.url != nil {
-                VStack(alignment: .leading, spacing: 6) {
-                    Toggle(isOn: Binding(
-                        get: { store.allowsSignIn(for: tab) },
-                        set: { _ in store.toggleSignIn(for: tab) }
-                    )) {
-                        Text("Allow sign-in on \(site)")
-                            .font(.system(size: 12.5, weight: .medium))
-                    }
-                    .toggleStyle(.switch)
-                    .controlSize(.small)
-                    .tint(Nightglass.accent)
-                    Text("Trouble logging in? This lets sign-in cookies through while ads and trackers stay blocked.")
-                        .font(.system(size: 11.5))
-                        .foregroundStyle(Nightglass.mutedText)
-                        .fixedSize(horizontal: false, vertical: true)
-                }
-                VStack(alignment: .leading, spacing: 6) {
-                    Toggle(isOn: Binding(
-                        get: { store.isLockedDown(tab) },
-                        set: { _ in store.toggleLockdown(for: tab) }
-                    )) {
-                        Label("Lockdown Mode on \(site)", systemImage: "lock.shield")
-                            .font(.system(size: 12.5, weight: .medium))
-                    }
-                    .toggleStyle(.switch)
-                    .controlSize(.small)
-                    .tint(Nightglass.accent)
-                    Text("Apple's strictest protection, for sites you don't trust or ones that matter a lot, like your bank. Some fancy features (3D, fast scripts, some fonts) turn off.")
-                        .font(.system(size: 11.5))
-                        .foregroundStyle(Nightglass.mutedText)
-                        .fixedSize(horizontal: false, vertical: true)
-                }
-                if store.privacy.blockPopups {
-                    Toggle(isOn: Binding(
-                        get: { store.allowsPopups(for: tab) },
-                        set: { store.setPopupsAllowed($0, for: site) }
-                    )) {
-                        Text("Allow pop-ups on \(site)")
-                            .font(.system(size: 12.5, weight: .medium))
-                    }
-                    .toggleStyle(.switch)
-                    .controlSize(.small)
-                    .tint(Nightglass.accent)
-                }
-            }
+            .padding(18)
 
             Divider()
 
-            PrivacyControls()
+            ScrollView(.vertical) {
+                VStack(alignment: .leading, spacing: 16) {
+                    HStack(spacing: 8) {
+                        StatTile(value: tab.trackersFound.count, label: "Trackers", color: Nightglass.accent)
+                        StatTile(value: tab.popupsBlocked.count, label: "Pop-ups", color: Nightglass.claude)
+                        StatTile(value: store.trackersBlockedTotal, label: "All time", color: Nightglass.spotify)
+                    }
+
+                    if !tab.trackersFound.isEmpty {
+                        DisclosureGroup("Blocked on this page", isExpanded: $showTrackers) {
+                            VStack(alignment: .leading, spacing: 4) {
+                                ForEach(tab.trackersFound, id: \.self) { domain in
+                                    Text(domain)
+                                        .font(.system(size: 12, design: .monospaced))
+                                        .foregroundStyle(Nightglass.secondaryText)
+                                }
+                            }
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .padding(.top, 6)
+                        }
+                        .font(.system(size: 12.5, weight: .medium))
+                    }
+
+                    if tab.url != nil {
+                        VStack(alignment: .leading, spacing: 8) {
+                            Text("JavaScript on \(site)")
+                                .font(.system(size: 12.5, weight: .medium))
+                            ScriptSlider(level: Binding(
+                                get: { store.scriptLevel(for: tab) },
+                                set: { store.setScriptLevel($0, for: tab) }
+                            ))
+                        }
+                    }
+
+                    if tab.url != nil {
+                        VStack(alignment: .leading, spacing: 6) {
+                            Toggle(isOn: Binding(
+                                get: { store.allowsSignIn(for: tab) },
+                                set: { _ in store.toggleSignIn(for: tab) }
+                            )) {
+                                Text("Allow sign-in on \(site)")
+                                    .font(.system(size: 12.5, weight: .medium))
+                            }
+                            .toggleStyle(.switch)
+                            .controlSize(.small)
+                            .tint(Nightglass.accent)
+                            Text("Trouble logging in? This lets sign-in cookies through while ads and trackers stay blocked.")
+                                .font(.system(size: 11.5))
+                                .foregroundStyle(Nightglass.mutedText)
+                                .fixedSize(horizontal: false, vertical: true)
+                        }
+                        VStack(alignment: .leading, spacing: 6) {
+                            Toggle(isOn: Binding(
+                                get: { store.isLockedDown(tab) },
+                                set: { _ in store.toggleLockdown(for: tab) }
+                            )) {
+                                Label("Lockdown Mode on \(site)", systemImage: "lock.shield")
+                                    .font(.system(size: 12.5, weight: .medium))
+                            }
+                            .toggleStyle(.switch)
+                            .controlSize(.small)
+                            .tint(Nightglass.accent)
+                            Text("Apple's strictest protection, for sites you don't trust or ones that matter a lot, like your bank. Some fancy features (3D, fast scripts, some fonts) turn off.")
+                                .font(.system(size: 11.5))
+                                .foregroundStyle(Nightglass.mutedText)
+                                .fixedSize(horizontal: false, vertical: true)
+                        }
+                        if store.privacy.blockPopups {
+                            Toggle(isOn: Binding(
+                                get: { store.allowsPopups(for: tab) },
+                                set: { store.setPopupsAllowed($0, for: site) }
+                            )) {
+                                Text("Allow pop-ups on \(site)")
+                                    .font(.system(size: 12.5, weight: .medium))
+                            }
+                            .toggleStyle(.switch)
+                            .controlSize(.small)
+                            .tint(Nightglass.accent)
+                        }
+                    }
+
+                    Divider()
+
+                    PrivacyControls()
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(18)
+                .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { contentHeight = $0 }
+            }
+            .frame(height: min(contentHeight, Self.maxScrollHeight))
+            .scrollIndicators(.automatic)
+
+            Divider()
 
             HStack(spacing: 16) {
                 Button {
@@ -190,9 +210,18 @@ struct ShieldPopover: View {
             .font(.system(size: 12.5, weight: .medium))
             .buttonStyle(.plain)
             .foregroundStyle(Nightglass.accent)
+            .padding(.horizontal, 18)
+            .padding(.vertical, 14)
         }
-        .padding(18)
         .frame(width: 350)
+    }
+
+    /// The most the middle part may grow before it scrolls: the screen's
+    /// usable height, minus room for the toolbar, the panel's top line and
+    /// its buttons. (A popover taller than the screen gets cut off.)
+    private static var maxScrollHeight: CGFloat {
+        let screen = NSScreen.main?.visibleFrame.height ?? 800
+        return max(240, screen - 260)
     }
 }
 
