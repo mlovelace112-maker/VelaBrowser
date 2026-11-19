@@ -90,6 +90,39 @@ final class BrowserStore {
             ruleList: ruleList,
             privacy: privacy
         )
+        connect(tab)
+
+        // Open next to the tab that opened it, inside the same group.
+        if let opener, let index = tabs.firstIndex(where: { $0.id == opener.id }) {
+            tab.groupID = opener.isPinned ? nil : opener.groupID
+            tabs.insert(tab, at: index + 1)
+        } else {
+            tabs.append(tab)
+        }
+
+        if let url { tab.load(url) }
+        if select { selectedTabID = tab.id }
+        if url == nil { addressBarFocusRequest += 1 }
+        return tab
+    }
+
+    /// A window a page opened (a target="_blank" link or a sign-in pop-up).
+    /// It opens as a tab next to the page, still linked to it.
+    func openWindow(configuration: WKWebViewConfiguration, url: URL?, opener: BrowserTab) -> WKWebView {
+        let tab = BrowserTab(popupConfiguration: configuration, isPrivate: opener.isPrivate, url: url)
+        connect(tab)
+        if let index = tabs.firstIndex(where: { $0.id == opener.id }) {
+            tab.groupID = opener.isPinned ? nil : opener.groupID
+            tabs.insert(tab, at: index + 1)
+        } else {
+            tabs.append(tab)
+        }
+        selectedTabID = tab.id
+        return tab.webView
+    }
+
+    /// Hooks a tab up to the store: history, the shield, downloads and passwords.
+    private func connect(_ tab: BrowserTab) {
         tab.settings = { [weak self] in self?.privacy ?? PrivacySettings() }
         tab.onOpenInNewTab = { [weak self, weak tab] url in
             self?.newTab(url: url, opener: tab)
@@ -112,19 +145,13 @@ final class BrowserStore {
         tab.onLoginSubmitted = { [weak self, weak tab] host, username, password in
             if let tab { self?.offerToSave(host: host, username: username, password: password, from: tab) }
         }
-
-        // Open next to the tab that opened it, inside the same group.
-        if let opener, let index = tabs.firstIndex(where: { $0.id == opener.id }) {
-            tab.groupID = opener.isPinned ? nil : opener.groupID
-            tabs.insert(tab, at: index + 1)
-        } else {
-            tabs.append(tab)
+        tab.onOpenWindow = { [weak self, weak tab] configuration, url in
+            guard let self, let tab else { return nil }
+            return self.openWindow(configuration: configuration, url: url, opener: tab)
         }
-
-        if let url { tab.load(url) }
-        if select { selectedTabID = tab.id }
-        if url == nil { addressBarFocusRequest += 1 }
-        return tab
+        tab.onCloseRequested = { [weak self, weak tab] in
+            if let tab { self?.close(tab) }
+        }
     }
 
     func select(_ tab: BrowserTab) {

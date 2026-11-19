@@ -98,6 +98,18 @@ enum ContentBlocker {
             ])
         }
 
+        // 5b. Sign-in services ("Sign in with Google" and friends) need their own
+        //     cookies inside other sites' sign-in buttons, or logging in breaks.
+        //     "ignore-previous-rules" undoes everything above for just these addresses.
+        if !rules.isEmpty {
+            for domain in signInDomains {
+                rules.append([
+                    "trigger": ["url-filter": urlPattern(for: domain)],
+                    "action": ["type": "ignore-previous-rules"],
+                ])
+            }
+        }
+
         // 6. Upgrade insecure http:// requests to https://.
         if settings.upgradeToHTTPS {
             rules.append([
@@ -388,6 +400,11 @@ enum ContentBlocker {
         "cdn.segment.com", "api.segment.io", "heapanalytics.com", "kissmetrics.com",
         "chartbeat.com", "chartbeat.net", "statcounter.com", "nr-data.net", "amplitude.com",
         "branch.io", "app-measurement.com", "newrelic.com", "pendo.io", "quantummetric.com",
+    ]
+
+    /// "Sign in with Google / Apple / Microsoft" services that keep their cookies.
+    static let signInDomains: [String] = [
+        "accounts.google.com", "appleid.apple.com", "login.microsoftonline.com", "login.live.com",
     ]
 
     /// Parts of web addresses that only ads use. Aggressive mode blocks these

@@ -43,6 +43,11 @@ final class BrowserTab: Identifiable {
 
     /// Called when a page asks to open a link in a new window/tab.
     @ObservationIgnored var onOpenInNewTab: (@MainActor (URL) -> Void)?
+    /// Called when a page opens a new window (a link with target="_blank" or
+    /// a sign-in pop-up). Must return a web view made with this exact configuration.
+    @ObservationIgnored var onOpenWindow: (@MainActor (WKWebViewConfiguration, URL?) -> WKWebView?)?
+    /// Called when the page closes its own window (window.close()).
+    @ObservationIgnored var onCloseRequested: (@MainActor () -> Void)?
     /// Called when a page finishes loading (used to record History).
     @ObservationIgnored var onFinishLoading: (@MainActor () -> Void)?
     /// Called when the shield's page script spots a tracker.
@@ -92,6 +97,36 @@ final class BrowserTab: Identifiable {
         installScripts(for: privacy)
 
         // Key-Value Observing (KVO): WebKit tells us whenever these change.
+        observations = [
+            watch(\.title),
+            watch(\.url),
+            watch(\.isLoading),
+            watch(\.canGoBack),
+            watch(\.canGoForward),
+            watch(\.estimatedProgress),
+        ]
+    }
+
+    /// A tab for a window that a page opened, such as "Sign in with Google".
+    ///
+    /// **Why it's special:** WebKit links this window to the page that opened
+    /// it (`window.opener`), so the sign-in pop-up can hand your login back to
+    /// the site and close itself. That link only works if the new web view uses
+    /// the *exact* configuration WebKit gives us, so this tab shares the opener's
+    /// blocking rules, scripts and message mailboxes instead of making its own.
+    init(popupConfiguration: WKWebViewConfiguration, isPrivate: Bool, url: URL?) {
+        contentController = popupConfiguration.userContentController
+        webView = WKWebView(frame: .zero, configuration: popupConfiguration)
+        webView.allowsBackForwardNavigationGestures = true
+        webView.allowsMagnification = true
+        self.isPrivate = isPrivate
+        coordinator = TabCoordinator()
+        self.url = url
+
+        coordinator.tab = self
+        webView.navigationDelegate = coordinator
+        webView.uiDelegate = coordinator
+
         observations = [
             watch(\.title),
             watch(\.url),
@@ -219,18 +254,23 @@ final class TabCoordinator: NSObject, WKNavigationDelegate, WKUIDelegate, WKScri
         for navigationAction: WKNavigationAction,
         windowFeatures: WKWindowFeatures
     ) -> WKWebView? {
-        guard let tab, let url = navigationAction.request.url else { return nil }
+        guard let tab else { return nil }
+        let url = navigationAction.request.url
         let settings = tab.settings()
 
         // Pop-under protection: never open a new tab straight to an ad network.
         if settings.blockingLevel != .off, settings.popUnderProtection, shieldsUp(for: tab, settings),
-           let host = url.host(), ContentBlocker.isTracker(host) {
+           let url, let host = url.host(), ContentBlocker.isTracker(host) {
             tab.onPopupBlocked?(url, true)
             return nil
         }
-        // Open target="_blank" links as a new tab instead of a new window.
-        tab.onOpenInNewTab?(url)
-        return nil
+        // Open the new window as a tab that stays linked to this page.
+        return tab.onOpenWindow?(configuration, url)
+    }
+
+    /// The page called window.close(), e.g. a sign-in pop-up that's finished.
+    func webViewDidClose(_ webView: WKWebView) {
+        tab?.onCloseRequested?()
     }
 
     // MARK: Navigation decisions
