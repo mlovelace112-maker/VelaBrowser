@@ -139,19 +139,39 @@ struct ShieldPopover: View {
                         .foregroundStyle(Nightglass.mutedText)
                         .fixedSize(horizontal: false, vertical: true)
                 }
+                if store.privacy.blockPopups {
+                    Toggle(isOn: Binding(
+                        get: { store.allowsPopups(for: tab) },
+                        set: { store.setPopupsAllowed($0, for: site) }
+                    )) {
+                        Text("Allow pop-ups on \(site)")
+                            .font(.system(size: 12.5, weight: .medium))
+                    }
+                    .toggleStyle(.switch)
+                    .controlSize(.small)
+                    .tint(Nightglass.accent)
+                }
             }
 
             Divider()
 
             PrivacyControls()
 
-            Button {
-                dismiss()
-                store.isCookieManagerVisible = true
-            } label: {
-                Label("Manage Cookies and Site Data…", systemImage: "list.bullet.rectangle")
-                    .font(.system(size: 12.5, weight: .medium))
+            HStack(spacing: 16) {
+                Button {
+                    dismiss()
+                    store.isCookieManagerVisible = true
+                } label: {
+                    Label("Cookies…", systemImage: "list.bullet.rectangle")
+                }
+                Button {
+                    dismiss()
+                    store.isSiteSettingsVisible = true
+                } label: {
+                    Label("Site Settings…", systemImage: "globe")
+                }
             }
+            .font(.system(size: 12.5, weight: .medium))
             .buttonStyle(.plain)
             .foregroundStyle(Nightglass.accent)
         }
@@ -189,6 +209,9 @@ struct PrivacyControls: View {
             }
             SettingRow("Block websites from my home network") {
                 Toggle("Block websites from my home network", isOn: store.privacyBinding(\.blockLocalNetworkAccess))
+            }
+            SettingRow("Fingerprinting protection") {
+                Toggle("Fingerprinting protection", isOn: store.privacyBinding(\.fingerprintProtection))
             }
         }
         .toggleStyle(.switch)

@@ -291,6 +291,11 @@ enum BrowserTools {
     /// read, and stops a malicious page from tricking Claude into typing
     /// or submitting something there.
     private static func ensureNotSensitive(_ tab: BrowserTab) async throws {
+        // A sleeping tab has no page loaded yet: wake it first.
+        if tab.isAsleep {
+            tab.wake()
+            await waitForLoad(tab)
+        }
         let hasPassword = (try? await runScript(
             "return !!document.querySelector('input[type=\"password\"]');",
             in: tab, arguments: [:]

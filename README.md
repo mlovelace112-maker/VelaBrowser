@@ -89,6 +89,13 @@ If a step fails, make the same change by hand in the repo's **Settings**: Code s
 | Zoom | ⌘= zooms in, ⌘- zooms out and ⌘0 resets. The zoom level shows in the address bar, and you can click it to reset. |
 | Share | The share button in the toolbar sends a page to Messages, Mail, AirDrop, Notes and so on. |
 
+### Tabs and video
+| Feature | How to use it |
+|---|---|
+| **Session restore** | Vela reopens the tabs (and tab groups) you had when you quit. They load when you click them, so even 50 tabs open instantly. Private tabs are never saved. Turn it off in Settings ▸ General ▸ Tabs. |
+| **Tab sleeping** | Tabs you haven't looked at for 30 minutes (change it in Settings ▸ General ▸ Tabs) unload to save memory and battery, and fade a little in the tab strip. Click one and it loads again. Pinned tabs, and tabs playing sound or using the camera, stay awake. Tabs ▸ **Put Other Tabs to Sleep** does it now. |
+| **Picture in picture** | **⌥⌘V** (or ••• ▸ Picture in Picture) pops the page's video into a small floating window that stays on top while you use other tabs and apps. Press it again to put it back. |
+
 ### Bookmarks and History
 | Feature | How to use it |
 |---|---|
@@ -107,6 +114,11 @@ If a step fails, make the same change by hand in the repo's **Settings**: Code s
 | Allow sign-in | School and work logins (Auth0, Okta, Microsoft, Google and others) keep their cookies automatically. If a site still sends you back to its login page, click the shield and turn on **Allow sign-in** for that site. Ads and trackers stay blocked. |
 | HTTPS upgrade | Insecure `http://` requests are switched to secure `https://`. |
 | **Warn before insecure sites** | If a site has no secure version, Vela stops with a warning page. **Go Back**, or **Continue to Site (Not Secure)** to remember that site. Manage the list in Settings ▸ Privacy. Your own network (router pages, `localhost`) is never warned about. |
+| **Fingerprinting protection** | On by default. Sites can recognize your Mac without cookies by drawing on a hidden canvas, measuring sound, or asking about your hardware. Vela adds invisible noise to those answers, different on every site and every launch (like Brave). Turn it off in the shield panel or for one site by turning that site's shield off. |
+| **Camera and microphone** | When a site asks, a banner over the page says "Use your camera?" with **Allow** / **Don't Allow** and **Remember**. A red camera or mic icon on the tab shows it's in use; click it to turn them off. |
+| **Site Settings** | Shield panel ▸ **Site Settings…**, Tabs ▸ Site Settings…, or Settings ▸ **Sites**. Every website you've made a choice for, with its camera, microphone, pop-ups, JavaScript, shield, sign-in, insecure access, kept cookies and password choices in one place. **Reset** forgets them all. |
+| **Pop-ups for one site** | With pop-ups blocked, the shield panel has **Allow pop-ups on this site**. |
+| **Email masking** | Settings ▸ Privacy ▸ Email masking: type your Duck Address (free at duckduckgo.com/email), paste the passphrase DuckDuckGo emails you, done. On a sign-up form press **⌥⌘E**: Vela makes a new private @duck.com address, fills it in and copies it. Mail is forwarded to your real inbox. (Apple's Hide My Email only works in Safari and Mail.) |
 | **Home-network blocking** | Websites can't secretly reach devices on your home network (your router, printer, `localhost`). Pages you open yourself on those addresses still work. |
 | Cookie manager | Open it from the shield panel or press ⌥⌘K. It shows every site's cookies, with trackers listed first. Delete one site, all trackers or everything. Mark a site **Keep** to stay signed in. |
 | Clear cookies on quit | Turn this on in the cookie manager or Settings. When Vela quits, it deletes every site's data except the sites marked Keep. |
@@ -125,6 +137,7 @@ If a step fails, make the same change by hand in the repo's **Settings**: Code s
 | **Downloads** | A downloads button appears in the toolbar with a progress ring. Click it to see your files, cancel, or show them in Finder. |
 | **Malicious download blocking** | Windows programs (.exe, .scr, .bat…), disguised files ("invoice.pdf.exe"), names with hidden flip characters, and anything from an ad network are blocked. Apps, installers, scripts and macro documents ask first. Hidden frames can't start downloads. |
 | **Google Safe Browsing** | Optional. Add a free API key in Settings ▸ Security and Vela checks each new page and download against Google's list of malware and phishing sites (the one Safari and Chrome use). Only the site and path are sent, never the part after "?". |
+| **Download scanning** | Optional. Add a free VirusTotal API key in Settings ▸ Security and each finished download is checked against about 70 antivirus engines. Only the file's SHA-256 fingerprint is sent, never the file. Flagged files get a red warning and a **Move to Trash** button. Right-click a download to copy its fingerprint. |
 | **macOS quarantine** | Every download is tagged "downloaded from the internet", so Gatekeeper and XProtect check apps before they open. |
 
 ### Passwords
@@ -191,8 +204,8 @@ The app also has a custom icon: a "V" drawn as the Vela constellation. Its sourc
 4. ✅ Extras: Claude in the address bar and side panel, the Spotify player, image and video search, and animation polish.
 5. ✅ Finishing touches: Reader, live Safari bookmarks, default browser, and a packaged app.
 6. ✅ Update pipeline: compile checks on pull requests, beta and stable releases, and self-updates with Sparkle.
-7. 🔨 Security round: Passwords-app import, password check, warnings for insecure sites, home-network blocking, Claude safety on sign-in pages, automatic and urgent updates, and an OWASP Top 10 review (see SECURITY.md). **← you are here**
-8. Next: fingerprinting protection, per-site permissions, email masking, session restore, tab sleeping, picture-in-picture, and download scanning.
+7. ✅ Security round: Passwords-app import, password check, warnings for insecure sites, home-network blocking, Claude safety on sign-in pages, automatic and urgent updates, and an OWASP Top 10 review (see SECURITY.md).
+8. 🔨 Privacy and tabs: fingerprinting protection, Site Settings with camera and microphone permissions, email masking, session restore, tab sleeping, picture in picture, and download scanning. **← you are here**
 
 ## How the code is organized
 

@@ -73,6 +73,15 @@ struct TabChip: View {
                     .lineLimit(1)
                     .truncationMode(.tail)
                 Spacer(minLength: 0)
+                if tab.isUsingCamera || tab.isUsingMicrophone {
+                    Button { tab.stopCapture() } label: {
+                        Image(systemName: tab.isUsingCamera ? "video.fill" : "mic.fill")
+                            .font(.system(size: 9, weight: .bold))
+                            .foregroundStyle(Nightglass.danger)
+                    }
+                    .buttonStyle(IconButtonStyle(size: 18))
+                    .help("This tab is using your \(tab.isUsingCamera ? "camera" : "microphone"). Click to turn it off.")
+                }
                 if isHovering || isSelected {
                     Button { store.close(tab) } label: {
                         Image(systemName: "xmark").font(.system(size: 9, weight: .bold))
@@ -96,11 +105,13 @@ struct TabChip: View {
             }
         }
         .shadow(color: .black.opacity(isSelected ? 0.35 : 0), radius: 8, y: 3)
+        // Sleeping tabs fade a little, like Firefox and Edge.
+        .opacity(tab.isAsleep && !isSelected ? 0.55 : 1)
         .contentShape(Rectangle())
         .onTapGesture { store.select(tab) }
         .onHover { isHovering = $0 }
         .animation(.easeOut(duration: 0.15), value: isHovering)
-        .help(tab.isPinned ? tab.title : "")
+        .help(tab.isAsleep ? "\(tab.title) (sleeping to save memory)" : (tab.isPinned ? tab.title : ""))
         .accessibilityElement(children: .contain)
         .accessibilityLabel(tab.title)
         .accessibilityAddTraits(.isButton)
@@ -125,6 +136,8 @@ struct TabContextMenu: View {
         Button(tab.isPinned ? "Unpin Tab" : "Pin Tab") {
             withAnimation(Nightglass.spring) { store.togglePin(tab) }
         }
+        Button("Put Tab to Sleep") { tab.sleep() }
+            .disabled(tab.isAsleep || tab.url == nil || store.selectedTabID == tab.id)
 
         Divider()
 

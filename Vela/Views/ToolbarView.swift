@@ -140,6 +140,11 @@ struct PageMenu: View {
             Button("Summarize Page with Claude") { store.askClaudeInPanel("Summarize this page.") }
                 .disabled(tab.url == nil || tab.isPrivate)
             Divider()
+            Button("Picture in Picture") { Task { await store.togglePictureInPicture() } }
+                .disabled(tab.url == nil)
+            Button("Fill Private Email Address") { Task { await store.fillPrivateEmail() } }
+                .disabled(tab.url == nil)
+            Divider()
             Button("Find on Page…") { store.showFindBar() }
                 .disabled(tab.url == nil)
             Section("Zoom: \(Int((tab.zoom * 100).rounded()))%") {

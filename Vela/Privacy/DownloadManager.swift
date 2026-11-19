@@ -28,6 +28,10 @@ final class DownloadItem: Identifiable {
     var fileURL: URL?
     var progress: Double = 0
     var state: DownloadState = .downloading
+    /// The VirusTotal result once it's saved.
+    var scan: DownloadScan = .none
+    /// The file's SHA-256 fingerprint (shown so you can compare it with the website's).
+    var sha256: String?
 
     @ObservationIgnored fileprivate var download: WKDownload?
 
@@ -58,6 +62,7 @@ struct DownloadWarning: Identifiable, Equatable {
 final class DownloadManager {
     var items: [DownloadItem] = []
     var pendingWarning: DownloadWarning?
+    let virusTotal = VirusTotal()
 
     /// Reads your current privacy settings (set by BrowserStore).
     @ObservationIgnored var settings: @MainActor () -> PrivacySettings = { PrivacySettings() }
@@ -177,8 +182,34 @@ final class DownloadManager {
         guard let item = itemsByDownload[ObjectIdentifier(download)] else { return }
         item.progress = 1
         item.state = .finished
-        if let url = item.fileURL { quarantine(url, item: item) }
+        if let url = item.fileURL {
+            quarantine(url, item: item)
+            scan(item, at: url)
+        }
         stopTracking(item)
+    }
+
+    /// Fingerprints the file on your Mac, then asks VirusTotal about it.
+    private func scan(_ item: DownloadItem, at url: URL) {
+        let lookUp = settings().scanDownloads && virusTotal.hasKey
+        if lookUp { item.scan = .scanning }
+        Task {
+            let hash = await Task.detached(priority: .utility) { VirusTotal.sha256(of: url) }.value
+            item.sha256 = hash
+            guard lookUp, let hash else {
+                item.scan = .none
+                return
+            }
+            item.scan = await virusTotal.lookup(sha256: hash)
+        }
+    }
+
+    /// "Move to Trash" for a file VirusTotal flagged.
+    func trash(_ item: DownloadItem) {
+        guard let url = item.fileURL else { return }
+        try? FileManager.default.trashItem(at: url, resultingItemURL: nil)
+        item.fileURL = nil
+        item.state = .blocked("Moved to the Trash.")
     }
 
     fileprivate func didFail(_ download: WKDownload, error: Error) {

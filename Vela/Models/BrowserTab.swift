@@ -51,6 +51,17 @@ final class BrowserTab: Identifiable {
     /// Set while Reader mode shows this page's article.
     var reader: ReaderArticle?
 
+    /// A website asking to use your camera or microphone, waiting for your answer.
+    var permissionRequest: PermissionRequest?
+    /// True while the page is using your camera or microphone.
+    var isUsingCamera = false
+    var isUsingMicrophone = false
+    /// A sleeping tab's page was unloaded to free memory. It loads again,
+    /// right where the address was, as soon as you open the tab.
+    private(set) var isAsleep = false
+    /// When you last looked at this tab (tab sleeping uses it).
+    @ObservationIgnored var lastActive = Date()
+
     /// Page zoom: 1.0 is 100%. Change it with zoomIn(), zoomOut() or resetZoom().
     private(set) var zoom: Double = 1
 
@@ -75,6 +86,8 @@ final class BrowserTab: Identifiable {
     @ObservationIgnored var onLoginFieldFocused: (@MainActor (String) -> Void)?
     /// Called when you submit a login: host, username, password.
     @ObservationIgnored var onLoginSubmitted: (@MainActor (String, String, String) -> Void)?
+    /// A page asked for the camera and/or microphone. Call the answer with true to allow.
+    @ObservationIgnored var onMediaPermission: (@MainActor (String, [PermissionKind], @escaping @MainActor (Bool) -> Void) -> Void)?
     /// Asks Google Safe Browsing about an address (set by BrowserStore).
     @ObservationIgnored var checkThreat: (@MainActor (URL) async -> SafeBrowsingThreat?)?
     /// Reads your current privacy settings (set by BrowserStore).
@@ -123,6 +136,8 @@ final class BrowserTab: Identifiable {
             watch(\.canGoBack),
             watch(\.canGoForward),
             watch(\.estimatedProgress),
+            watch(\.cameraCaptureState),
+            watch(\.microphoneCaptureState),
         ]
     }
 
@@ -153,10 +168,13 @@ final class BrowserTab: Identifiable {
             watch(\.canGoBack),
             watch(\.canGoForward),
             watch(\.estimatedProgress),
+            watch(\.cameraCaptureState),
+            watch(\.microphoneCaptureState),
         ]
     }
 
     func load(_ url: URL) {
+        isAsleep = false
         mediaSearch = nil
         reader = nil
         self.url = url
@@ -187,6 +205,9 @@ final class BrowserTab: Identifiable {
         }
         contentController.addUserScript(LinkChecker.hoverScript())
         contentController.addUserScript(PasswordScripts.loginScript())
+        if privacy.fingerprintProtection {
+            contentController.addUserScript(Fingerprinting.script(shieldsDownSites: privacy.shieldsDownSites))
+        }
     }
 
     /// "Open Anyway" on the dangerous-link warning.
@@ -241,6 +262,106 @@ final class BrowserTab: Identifiable {
         webView.configuration.preferences.javaScriptCanOpenWindowsAutomatically = allowed
     }
 
+    // MARK: Sleeping tabs
+
+    /// Unloads the page to free memory, keeping its address and title.
+    func sleep() {
+        guard !isAsleep, url != nil, mediaSearch == nil, reader == nil else { return }
+        isAsleep = true
+        webView.stopLoading()
+        webView.loadHTMLString("", baseURL: nil)
+    }
+
+    /// Loads a sleeping tab's page again.
+    func wake() {
+        guard isAsleep, let url else { return }
+        // If the page is still in this tab's history (it was put to sleep,
+        // not restored from last session), step back to it. That keeps your
+        // Back and Forward history the way it was.
+        if let previous = webView.backForwardList.backItem, previous.url == url,
+           webView.backForwardList.currentItem?.url.scheme == "about" {
+            isAsleep = false
+            webView.goBack()
+        } else {
+            load(url)
+        }
+    }
+
+    /// A tab brought back from your last session. It stays asleep (nothing
+    /// loads) until you open it, so restoring 30 tabs is instant.
+    func restoreAsleep(url: URL, title: String) {
+        self.url = url
+        self.title = title.isEmpty ? BrowserStore.siteName(url) : title
+        isAsleep = true
+    }
+
+    /// Stops the camera and microphone for this tab (the red icon on the tab).
+    func stopCapture() {
+        webView.setCameraCaptureState(.none, completionHandler: nil)
+        webView.setMicrophoneCaptureState(.none, completionHandler: nil)
+    }
+
+    // MARK: Picture in picture and private email
+
+    /// Moves the page's video into a small floating window, or back.
+    /// Returns what happened: "on", "off", "none" (no video) or "unsupported".
+    func togglePictureInPicture() async -> String {
+        let body = """
+        const videos = [...document.querySelectorAll('video')].filter((v) => v.readyState > 0 || v.currentSrc);
+        if (!videos.length) return 'none';
+        const playing = videos.find((v) => !v.paused);
+        const video = playing || videos.sort((a, b) => b.clientWidth * b.clientHeight - a.clientWidth * a.clientHeight)[0];
+        video.disablePictureInPicture = false;
+        video.removeAttribute('disablepictureinpicture');
+        if (video.webkitPresentationMode === 'picture-in-picture' || document.pictureInPictureElement === video) {
+          if (video.webkitSetPresentationMode) video.webkitSetPresentationMode('inline');
+          else await document.exitPictureInPicture();
+          return 'off';
+        }
+        if (video.webkitSupportsPresentationMode && video.webkitSupportsPresentationMode('picture-in-picture')) {
+          video.webkitSetPresentationMode('picture-in-picture');
+          return 'on';
+        }
+        if (document.pictureInPictureEnabled) { await video.requestPictureInPicture(); return 'on'; }
+        return 'unsupported';
+        """
+        return (try? await runScript(body, arguments: [:])) as? String ?? "unsupported"
+    }
+
+    /// Types an email address into the box you're in (or the page's email
+    /// box). Returns true if it found somewhere to put it.
+    func fillEmail(_ address: String) async -> Bool {
+        let body = """
+        const usable = (el) => el && el.tagName === 'INPUT' && !el.disabled && !el.readOnly
+          && !['password', 'hidden', 'checkbox', 'radio', 'submit', 'button'].includes((el.type || '').toLowerCase());
+        let field = document.activeElement;
+        if (!usable(field)) {
+          field = [...document.querySelectorAll('input[type="email"], input[name*="email" i], input[autocomplete="email"]')]
+            .find((el) => usable(el) && el.offsetParent !== null);
+        }
+        if (!field) return false;
+        const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set;
+        setter.call(field, address);
+        field.dispatchEvent(new Event('input', { bubbles: true }));
+        field.dispatchEvent(new Event('change', { bubbles: true }));
+        field.focus();
+        return true;
+        """
+        return (try? await runScript(body, arguments: ["address": address])) as? Bool ?? false
+    }
+
+    /// Runs JavaScript in Vela's private script world (pages can't see it).
+    private func runScript(_ body: String, arguments: [String: Any]) async throws -> Any? {
+        try await withCheckedThrowingContinuation { continuation in
+            webView.callAsyncJavaScript(body, arguments: arguments, in: nil, in: .defaultClient) { result in
+                switch result {
+                case .success(let value): continuation.resume(returning: value)
+                case .failure(let error): continuation.resume(throwing: error)
+                }
+            }
+        }
+    }
+
     /// A new page started: forget the previous page's shield stats.
     fileprivate func resetPageStats() {
         trackersFound = []
@@ -251,6 +372,9 @@ final class BrowserTab: Identifiable {
         didAutoFill = false
         didFillPassword = false
         loginFrame = nil
+        // A question from the previous page no longer applies.
+        permissionRequest?.answer(false)
+        permissionRequest = nil
     }
 
     func zoomIn() { setZoom(zoom + 0.1) }
@@ -272,6 +396,12 @@ final class BrowserTab: Identifiable {
 
     /// Copies the web view's current state into our observable properties.
     private func syncFromWebView() {
+        isUsingCamera = webView.cameraCaptureState != .none
+        isUsingMicrophone = webView.microphoneCaptureState != .none
+        isLoading = webView.isLoading
+        progress = webView.estimatedProgress
+        // A sleeping tab keeps showing the page it had, not the empty page.
+        guard !isAsleep else { return }
         if let current = webView.url { url = current }
         let pageTitle = webView.title ?? ""
         if let mediaSearch {
@@ -281,10 +411,8 @@ final class BrowserTab: Identifiable {
         } else if let url {
             title = BrowserStore.siteName(url)
         }
-        isLoading = webView.isLoading
         canGoBack = webView.canGoBack
         canGoForward = webView.canGoForward
-        progress = webView.estimatedProgress
     }
 }
 
@@ -314,6 +442,29 @@ final class TabCoordinator: NSObject, WKNavigationDelegate, WKUIDelegate, WKScri
         }
         // Open the new window as a tab that stays linked to this page.
         return tab.onOpenWindow?(configuration, url)
+    }
+
+    /// A page asked for the camera or microphone. Vela uses your remembered
+    /// answer for the site, or asks you with a banner over the page.
+    func webView(
+        _ webView: WKWebView,
+        requestMediaCapturePermissionFor origin: WKSecurityOrigin,
+        initiatedByFrame frame: WKFrameInfo,
+        type: WKMediaCaptureType,
+        decisionHandler: @escaping (WKPermissionDecision) -> Void
+    ) {
+        guard let tab, let ask = tab.onMediaPermission else {
+            decisionHandler(.deny)
+            return
+        }
+        let kinds: [PermissionKind] = switch type {
+        case .camera: [.camera]
+        case .microphone: [.microphone]
+        default: [.camera, .microphone]
+        }
+        ask(PermissionKind.siteName(origin.host), kinds) { allowed in
+            decisionHandler(allowed ? .grant : .deny)
+        }
     }
 
     /// The page called window.close(), e.g. a sign-in pop-up that's finished.
@@ -422,6 +573,10 @@ final class TabCoordinator: NSObject, WKNavigationDelegate, WKUIDelegate, WKScri
     func webView(_ webView: WKWebView, didCommit navigation: WKNavigation!) {
         tab?.upgradedFrom = nil
         tab?.resetPageStats()
+        // Pop-ups: your per-site choice (Site Settings) or the global switch.
+        if let tab {
+            tab.setPopupsAllowed(tab.settings().allowsPopups(on: webView.url.map(BrowserStore.siteName)))
+        }
     }
 
     /// A page failed before anything appeared. If it was the secure version

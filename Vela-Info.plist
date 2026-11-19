@@ -18,6 +18,11 @@
 			</array>
 		</dict>
 	</array>
+	<!-- What macOS shows when a website first asks for the camera or microphone. -->
+	<key>NSCameraUsageDescription</key>
+	<string>Websites you allow, like video calls, can use your camera.</string>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>Websites you allow, like video calls, can use your microphone.</string>
 	<!-- Updates (Sparkle). The feed lists every version GitHub has built.
 	     SUPublicEDKey is the public half of the update key made by
 	     scripts/setup-updates.sh; Vela uses it to check that each download really came from your pipeline. -->

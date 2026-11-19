@@ -167,47 +167,11 @@ struct PrivacySettingsTab: View {
                 LabeledContent("Trackers and ads", value: "\(store.trackersBlockedTotal)")
                 LabeledContent("Pop-ups", value: "\(store.popupsBlockedTotal)")
             }
-            if !store.privacy.httpAllowedSites.isEmpty {
-                Section("Allowed without a secure connection") {
-                    ForEach(store.privacy.httpAllowedSites.sorted(), id: \.self) { site in
-                        HStack {
-                            Text(site)
-                            Spacer()
-                            Button("Remove") {
-                                store.updatePrivacy { $0.httpAllowedSites.remove(site) }
-                            }
-                            .controlSize(.small)
-                        }
-                    }
-                }
-            }
-            if !store.privacy.signInSites.isEmpty {
-                Section("Sign-in allowed on") {
-                    ForEach(store.privacy.signInSites.sorted(), id: \.self) { site in
-                        HStack {
-                            Text(site)
-                            Spacer()
-                            Button("Remove") {
-                                store.updatePrivacy { $0.signInSites.remove(site) }
-                            }
-                            .controlSize(.small)
-                        }
-                    }
-                }
-            }
-            if !store.privacy.shieldsDownSites.isEmpty {
-                Section("Shield turned off for") {
-                    ForEach(store.privacy.shieldsDownSites.sorted(), id: \.self) { site in
-                        HStack {
-                            Text(site)
-                            Spacer()
-                            Button("Turn Shield Back On") {
-                                store.updatePrivacy { $0.shieldsDownSites.remove(site) }
-                            }
-                            .controlSize(.small)
-                        }
-                    }
-                }
+            EmailMaskingSection()
+            Section {
+                Text("Choices you've made for single websites (camera, microphone, pop-ups, JavaScript, sign-in, the shield) are in the Sites tab.")
+                    .foregroundStyle(Nightglass.mutedText)
+                    .fixedSize(horizontal: false, vertical: true)
             }
         }
         .formStyle(.grouped)

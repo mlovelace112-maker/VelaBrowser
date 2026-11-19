@@ -58,6 +58,9 @@ struct ContentView: View {
         .sheet(isPresented: $store.isCookieManagerVisible) {
             CookieManagerView()
         }
+        .sheet(isPresented: $store.isSiteSettingsVisible) {
+            SiteSettingsSheet()
+        }
         .alert(
             downloadQuestion,
             isPresented: Binding(
@@ -129,6 +132,14 @@ private struct PageArea: View {
             }
         }
         .animation(Nightglass.spring, value: store.passwordPrompt)
+        .overlay(alignment: .topLeading) {
+            if let tab = store.selectedTab, let request = tab.permissionRequest {
+                PermissionBanner(tab: tab, request: request)
+                    .padding(14)
+                    .transition(.move(edge: .top).combined(with: .opacity))
+            }
+        }
+        .animation(Nightglass.spring, value: store.selectedTab?.permissionRequest)
         .animation(.easeOut(duration: 0.2), value: store.selectedTab?.url == nil)
         .animation(.easeOut(duration: 0.2), value: store.selectedTab?.mediaSearch == nil)
         .animation(Nightglass.spring, value: store.selectedTab?.reader)

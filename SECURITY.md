@@ -20,7 +20,7 @@ Please don't open a public issue for a security problem. Use **Security ▸ Repo
 
 | Risk | What it means for Vela | What Vela does |
 |---|---|---|
-| **A01 Broken access control** | A web page reaching things it shouldn't: your files, your home network, other sites' data. | Web pages can't open `file://` addresses. Websites can't reach `localhost`, your router or other home-network devices. Autofill only fills the exact site a login was saved for. Pop-ups and new windows need a click. |
+| **A01 Broken access control** | A web page reaching things it shouldn't: your files, your home network, your camera, other sites' data. | Camera and microphone need your OK per site (Site Settings). Web pages can't open `file://` addresses. Websites can't reach `localhost`, your router or other home-network devices. Autofill only fills the exact site a login was saved for. Pop-ups and new windows need a click. |
 | **A02 Cryptographic failures** | Data sent or stored without encryption. | Insecure `http://` is upgraded to HTTPS, and sites with no secure version show a warning first. Passwords and API keys live in the macOS Keychain, never in plain files. Imported password exports are shredded after use. |
 | **A03 Injection** | Untrusted text being run as code. | Vela's own scripts run in a separate JavaScript world that pages can't touch. Values from pages (usernames, passwords, link text) are size-limited and passed as data, never pasted into code. Page text sent to Claude is fenced off as untrusted. |
 | **A04 Insecure design** | Risky features with no guard rails. | Claude can't read or click on pages with a password box, and asks before closing tabs or sending forms. Dangerous downloads are blocked, and risky ones ask first. |
