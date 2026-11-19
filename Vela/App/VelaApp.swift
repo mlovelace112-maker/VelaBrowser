@@ -80,6 +80,10 @@ struct BrowserCommands: Commands {
                 store.isClaudePanelVisible.toggle()
             }
             .keyboardShortcut("a", modifiers: [.command, .shift])
+            Button(store.spotify.isBarVisible ? "Hide Spotify Player" : "Show Spotify Player") {
+                store.spotify.isBarVisible.toggle()
+            }
+            .keyboardShortcut("s", modifiers: [.command, .option])
             Divider()
             Button("Zoom In") { store.selectedTab?.zoomIn() }
                 .keyboardShortcut("=")

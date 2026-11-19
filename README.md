@@ -86,6 +86,15 @@ The first build takes a minute. If Xcode asks about signing, choose **Sign to Ru
 | **Asks first** | Closing tabs and clicks that would send a form show an **Allow / Don't Allow** card. **Stop** cancels at any point. |
 | **Privacy** | Claude sees a page's text only when it reads that page. Private tabs are never shared. Page text is marked as untrusted, and Claude is told never to follow instructions hidden in it. |
 
+### Spotify
+| Feature | How to use it |
+|---|---|
+| **Set up** | At [developer.spotify.com/dashboard](https://developer.spotify.com/dashboard), create an app with the redirect URI `vela-spotify://callback` and tick Web API and Web Playback SDK. Paste its Client ID in Settings ▸ Spotify, then **Connect Spotify**. Needs Premium. |
+| **Player bar** | Along the bottom: cover art, song and artist, previous / play / next, and a progress line you can click to jump. ⌥⌘S shows or hides it. |
+| **Vela as a speaker** | Vela runs Spotify's own web player in a hidden page, so it appears in Spotify as a device called "Vela". No Spotify app needed. |
+| **Library** | The ♫ button searches songs, albums and playlists and lists your playlists. Click to play. |
+| **Devices** | The speaker button sets the volume and moves playback between Vela, your phone and speakers. |
+
 ### Look and feel
 | Feature | How to use it |
 |---|---|
@@ -100,7 +109,7 @@ The app also has a custom icon: a "V" drawn as the Vela constellation. Its sourc
 2. ✅ Core browser: tabs, tab groups, address bar, bookmarks, plus Safari-style extras: a sidebar, history, find, zoom, private tabs, pinned tabs and a custom icon. 
 3. ✅ Privacy: pop-up blocker, ad and tracker blocking, cookie manager.
 3½. ✅ Security and looks: passwords, link checker, safe downloads, script slider, pop-under and stronger ad blocking, themes.
-4. ⏳ Extras: ✅ Claude in the address bar and side panel **← you are here**, then the Spotify player, image and video search.
+4. ⏳ Extras: ✅ Claude in the address bar and side panel, ✅ the Spotify player **← you are here**, then image and video search.
 
 ## How the code is organized
 
@@ -116,6 +125,9 @@ Vela/
     DownloadManager.swift    Downloads, the download guard, and macOS quarantine.
   Passwords/
     PasswordVault.swift      The Keychain password store, Touch ID, the generator, fill scripts.
+  Spotify/
+    SpotifyAuth.swift        Signing in to Spotify (OAuth with PKCE).
+    SpotifyPlayer.swift      Now playing, controls, library, devices and the hidden web player.
   Claude/
     ClaudeClient.swift       Talks to the Claude API: streaming replies, models, the Keychain key.
     ClaudeAssistant.swift    The chat, quick answers and the tool loop.
@@ -137,6 +149,7 @@ Vela/
     SecurityViews.swift      Link bubble, dangerous-link warning, downloads, "Save password?", Security settings.
     PasswordsView.swift      The Passwords window (⌥⌘P).
     ClaudeViews.swift        The Claude panel, the quick-answer card and Settings ▸ Claude.
+    SpotifyViews.swift       The Spotify bar, library and devices popovers, and Settings ▸ Spotify.
     SettingsView.swift       The Settings window and its Appearance tab.
     CookieManagerView.swift  The cookie manager and the Privacy settings tab.
     BookmarksBarView.swift   The bookmarks row.

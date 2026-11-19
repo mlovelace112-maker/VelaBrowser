@@ -1,7 +1,8 @@
 import SwiftUI
 
 /// The whole browser window, top to bottom:
-/// tab strip → toolbar → bookmarks bar → (find bar) → sidebar + the page.
+/// tab strip → toolbar → bookmarks bar → (find bar) → sidebar + the page +
+/// Claude → the Spotify bar.
 struct ContentView: View {
     @Environment(BrowserStore.self) private var store
 
@@ -42,11 +43,17 @@ struct ContentView: View {
             .sheet(isPresented: $store.isPasswordsVisible) {
                 PasswordsView()
             }
+
+            if store.spotify.isBarVisible {
+                SpotifyBar()
+                    .transition(.move(edge: .bottom).combined(with: .opacity))
+            }
         }
         .ignoresSafeArea()
         .background(Nightglass.background)
         .animation(Nightglass.spring, value: store.isSidebarVisible)
         .animation(Nightglass.spring, value: store.isClaudePanelVisible)
+        .animation(Nightglass.spring, value: store.spotify.isBarVisible)
         .animation(Nightglass.spring, value: store.isFindBarVisible)
         .sheet(isPresented: $store.isCookieManagerVisible) {
             CookieManagerView()

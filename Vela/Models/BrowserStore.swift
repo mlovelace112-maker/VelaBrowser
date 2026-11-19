@@ -46,6 +46,9 @@ final class BrowserStore {
     // Claude
     let claude = ClaudeAssistant()
     var isClaudePanelVisible = false
+
+    // Spotify
+    let spotify = SpotifyPlayer()
     /// "Save password?" waiting for an answer.
     var passwordPrompt: PasswordPrompt?
     /// The compiled blocking rules every tab uses.
