@@ -1,11 +1,18 @@
 import SwiftUI
 
-/// Back, forward, reload, the address bar and the bookmark star.
+/// Sidebar, back, forward, reload, the address bar, bookmarks and share.
 struct ToolbarView: View {
     @Environment(BrowserStore.self) private var store
 
     var body: some View {
         HStack(spacing: 6) {
+            Button { withAnimation(Nightglass.spring) { store.isSidebarVisible.toggle() } } label: {
+                Image(systemName: "sidebar.left")
+                    .foregroundStyle(store.isSidebarVisible ? Nightglass.accent : Nightglass.secondaryText)
+            }
+            .buttonStyle(IconButtonStyle())
+            .help("Show Sidebar (⇧⌘L)")
+
             if let tab = store.selectedTab {
                 Button { tab.webView.goBack() } label: { Image(systemName: "chevron.left") }
                     .buttonStyle(IconButtonStyle())
@@ -33,14 +40,37 @@ struct ToolbarView: View {
                 AddressBar(tab: tab)
                     .padding(.horizontal, 6)
 
+                // Star: add or remove this page from your bookmarks.
                 Button { store.toggleBookmark(for: tab) } label: {
                     let saved = store.isBookmarked(tab.url)
                     Image(systemName: saved ? "star.fill" : "star")
                         .foregroundStyle(saved ? Nightglass.accent : Nightglass.secondaryText)
+                        .symbolEffect(.bounce, value: saved)
                 }
                 .buttonStyle(IconButtonStyle())
                 .disabled(tab.url == nil)
                 .help("Bookmark This Page (⌘D)")
+
+                // Book: open your list of bookmarks.
+                Button { withAnimation(Nightglass.spring) { store.showSidebar(.bookmarks) } } label: {
+                    Image(systemName: "book")
+                        .foregroundStyle(
+                            store.isSidebarVisible && store.sidebarSection == .bookmarks
+                                ? Nightglass.accent : Nightglass.secondaryText
+                        )
+                }
+                .buttonStyle(IconButtonStyle())
+                .help("Show Bookmarks (⌥⌘B)")
+
+                if let url = tab.url {
+                    ShareLink(item: url) {
+                        Image(systemName: "square.and.arrow.up")
+                    }
+                    .buttonStyle(IconButtonStyle())
+                    .help("Share")
+                }
+
+                PageMenu(tab: tab)
             }
         }
         .padding(.horizontal, 12)
@@ -50,6 +80,43 @@ struct ToolbarView: View {
                 LoadingBar(progress: tab.progress)
             }
         }
+    }
+}
+
+/// The "•••" menu: zoom, find, private tab, history and more.
+struct PageMenu: View {
+    @Environment(BrowserStore.self) private var store
+    let tab: BrowserTab
+
+    var body: some View {
+        Menu {
+            Button("New Tab") { store.newTab() }
+            Button("New Private Tab") { store.newTab(isPrivate: true) }
+            Button("Reopen Closed Tab") { store.reopenClosedTab() }
+                .disabled(!store.canReopenClosedTab)
+            Divider()
+            Button("Find on Page…") { store.showFindBar() }
+                .disabled(tab.url == nil)
+            Section("Zoom: \(Int((tab.zoom * 100).rounded()))%") {
+                Button("Zoom In") { tab.zoomIn() }
+                Button("Zoom Out") { tab.zoomOut() }
+                Button("Actual Size") { tab.resetZoom() }
+            }
+            Divider()
+            Button("Show Bookmarks") { withAnimation(Nightglass.spring) { store.showSidebar(.bookmarks) } }
+            Button("Show History") { withAnimation(Nightglass.spring) { store.showSidebar(.history) } }
+            Button("Bookmark All Tabs") { store.addBookmarksForAllTabs() }
+            Divider()
+            Button("Copy Link") { store.copyLink(of: tab) }
+                .disabled(tab.url == nil)
+        } label: {
+            Image(systemName: "ellipsis")
+        }
+        .menuStyle(.borderlessButton)
+        .menuIndicator(.hidden)
+        .fixedSize()
+        .frame(width: 30, height: 30)
+        .help("More")
     }
 }
 
@@ -89,7 +156,16 @@ struct AddressBar: View {
                 .foregroundStyle(tab.url?.scheme == "https" ? Nightglass.spotify : Nightglass.mutedText)
                 .accessibilityHidden(true)
 
-            TextField("Search or enter address", text: $text)
+            if tab.isPrivate {
+                Text("Private")
+                    .font(.system(size: 11, weight: .semibold))
+                    .foregroundStyle(Nightglass.accent)
+                    .padding(.horizontal, 7)
+                    .padding(.vertical, 2)
+                    .background(Capsule().fill(Nightglass.accent.opacity(0.18)))
+            }
+
+            TextField(tab.isPrivate ? "Search privately or enter address" : "Search or enter address", text: $text)
                 .textFieldStyle(.plain)
                 .font(.system(size: 13.5))
                 .foregroundStyle(Nightglass.text)
@@ -98,6 +174,20 @@ struct AddressBar: View {
                     store.navigate(text, in: tab)
                     isFocused = false
                 }
+
+            // Shows the zoom level when it isn't 100%. Click to reset.
+            if tab.zoom != 1 {
+                Button { tab.resetZoom() } label: {
+                    Text("\(Int((tab.zoom * 100).rounded()))%")
+                        .font(.system(size: 11, weight: .semibold))
+                        .foregroundStyle(Nightglass.secondaryText)
+                        .padding(.horizontal, 7)
+                        .padding(.vertical, 2)
+                        .background(Capsule().fill(Color.white.opacity(0.1)))
+                }
+                .buttonStyle(.plain)
+                .help("Reset Zoom (⌘0)")
+            }
         }
         .padding(.horizontal, 12)
         .frame(height: 34)

@@ -1,0 +1,73 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
+<defs>
+  <linearGradient id="base" x1="0" y1="0" x2="1" y2="1">
+    <stop offset="0" stop-color="#1c1640"/>
+    <stop offset="0.55" stop-color="#0c0d18"/>
+    <stop offset="1" stop-color="#06131a"/>
+  </linearGradient>
+  <radialGradient id="glowV" cx="0.28" cy="0.25" r="0.6">
+    <stop offset="0" stop-color="#6b55ff" stop-opacity="0.55"/>
+    <stop offset="1" stop-color="#6b55ff" stop-opacity="0"/>
+  </radialGradient>
+  <radialGradient id="glowT" cx="0.8" cy="0.85" r="0.55">
+    <stop offset="0" stop-color="#1fb5a0" stop-opacity="0.45"/>
+    <stop offset="1" stop-color="#1fb5a0" stop-opacity="0"/>
+  </radialGradient>
+  <linearGradient id="sheen" x1="0" y1="0" x2="0" y2="1">
+    <stop offset="0" stop-color="#ffffff" stop-opacity="0.22"/>
+    <stop offset="0.35" stop-color="#ffffff" stop-opacity="0.04"/>
+    <stop offset="1" stop-color="#ffffff" stop-opacity="0"/>
+  </linearGradient>
+  <linearGradient id="vline" x1="0" y1="0" x2="1" y2="1">
+    <stop offset="0" stop-color="#b9adff"/>
+    <stop offset="0.6" stop-color="#8b7cff"/>
+    <stop offset="1" stop-color="#e8875f"/>
+  </linearGradient>
+  <linearGradient id="vline2" x1="1" y1="0" x2="0" y2="1">
+    <stop offset="0" stop-color="#7fe8cf"/>
+    <stop offset="1" stop-color="#e8875f"/>
+  </linearGradient>
+  <filter id="soft" x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur stdDeviation="14"/></filter>
+  <filter id="star" x="-200%" y="-200%" width="500%" height="500%"><feGaussianBlur stdDeviation="9"/></filter>
+  <filter id="shadow" x="-20%" y="-20%" width="140%" height="140%"><feDropShadow dx="0" dy="12" stdDeviation="14" flood-color="#000" flood-opacity="0.45"/></filter>
+  <clipPath id="sq"><rect x="100" y="100" width="824" height="824" rx="185"/></clipPath>
+</defs>
+<g filter="url(#shadow)"><rect x="100" y="100" width="824" height="824" rx="185" fill="url(#base)"/></g>
+<g clip-path="url(#sq)">
+  <rect x="100" y="100" width="824" height="824" fill="url(#glowV)"/>
+  <rect x="100" y="100" width="824" height="824" fill="url(#glowT)"/>
+  <!-- faint background stars -->
+  <g fill="#fff">
+    <circle cx="250" cy="300" r="3" opacity=".5"/><circle cx="780" cy="250" r="2.5" opacity=".45"/>
+    <circle cx="690" cy="760" r="2" opacity=".35"/><circle cx="300" cy="720" r="2.5" opacity=".35"/>
+    <circle cx="840" cy="520" r="2" opacity=".4"/><circle cx="200" cy="520" r="2" opacity=".3"/>
+    <circle cx="560" cy="210" r="2" opacity=".35"/>
+  </g>
+  <!-- constellation V -->
+  <g fill="none" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M318 318 L432 548 L512 726" stroke="url(#vline)" stroke-width="34" filter="url(#soft)" opacity=".7"/>
+    <path d="M706 318 L604 520 L512 726" stroke="url(#vline2)" stroke-width="34" filter="url(#soft)" opacity=".7"/>
+    <path d="M318 318 L432 548 L512 726" stroke="url(#vline)" stroke-width="16"/>
+    <path d="M706 318 L604 520 L512 726" stroke="url(#vline2)" stroke-width="16"/>
+  </g>
+  <!-- stars at vertices -->
+  <g>
+    <circle cx="318" cy="318" r="34" fill="#b9adff" filter="url(#star)" opacity=".9"/>
+    <circle cx="318" cy="318" r="17" fill="#fff"/>
+    <circle cx="432" cy="548" r="26" fill="#8b7cff" filter="url(#star)"/>
+    <circle cx="432" cy="548" r="12" fill="#fff"/>
+    <circle cx="604" cy="520" r="26" fill="#7fe8cf" filter="url(#star)"/>
+    <circle cx="604" cy="520" r="12" fill="#fff"/>
+    <circle cx="512" cy="726" r="40" fill="#e8875f" filter="url(#star)"/>
+    <circle cx="512" cy="726" r="19" fill="#fff"/>
+  </g>
+  <!-- bright four-point star top right -->
+  <g transform="translate(706 318)">
+    <circle r="48" fill="#7fe8cf" filter="url(#star)" opacity=".9"/>
+    <path d="M0 -78 C6 -18 18 -6 78 0 C18 6 6 18 0 78 C-6 18 -18 6 -78 0 C-18 -6 -6 -18 0 -78 Z" fill="#fff"/>
+  </g>
+  <!-- glass sheen and edge -->
+  <rect x="100" y="100" width="824" height="420" fill="url(#sheen)"/>
+</g>
+<rect x="101.5" y="101.5" width="821" height="821" rx="184" fill="none" stroke="#fff" stroke-opacity=".16" stroke-width="3"/>
+</svg>

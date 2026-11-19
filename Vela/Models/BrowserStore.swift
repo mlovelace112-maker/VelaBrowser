@@ -1,8 +1,9 @@
+import AppKit
 import Foundation
 import Observation
 import WebKit
 
-/// The browser's "brain": all tabs, tab groups and bookmarks live here.
+/// The browser's "brain": all tabs, tab groups, bookmarks and history live here.
 ///
 /// Views never change data directly. They call methods on the store, such as
 /// `newTab()`, `close(_:)` or `groupSimilarTabs()`, and SwiftUI redraws
@@ -15,11 +16,24 @@ final class BrowserStore {
     var groups: [TabGroup] = []
     var selectedTabID: UUID?
     var bookmarks: [Bookmark] = []
+    var history: [HistoryEntry] = []
+
+    // Window panels
+    var isSidebarVisible = false
+    var sidebarSection: SidebarSection = .bookmarks
+    var isFindBarVisible = false
+
     /// Bumped by ⌘L; the address bar watches it and grabs keyboard focus.
     var addressBarFocusRequest = 0
+    /// Bumped by ⌘F; the find bar watches it and grabs keyboard focus.
+    var findBarFocusRequest = 0
 
-    /// Shared settings for every tab's web view.
+    /// Shared settings for every normal tab's web view.
     @ObservationIgnored let configuration: WKWebViewConfiguration
+    /// Settings for private tabs: a "non-persistent" data store keeps cookies
+    /// and cache in memory only, so they vanish when Vela quits.
+    @ObservationIgnored let privateConfiguration: WKWebViewConfiguration
+    @ObservationIgnored private var recentlyClosed: [ClosedTab] = []
 
     init() {
         let config = WKWebViewConfiguration()
@@ -30,7 +44,14 @@ final class BrowserStore {
         config.preferences.javaScriptCanOpenWindowsAutomatically = false
         configuration = config
 
+        let privateConfig = WKWebViewConfiguration()
+        privateConfig.websiteDataStore = .nonPersistent()
+        privateConfig.applicationNameForUserAgent = config.applicationNameForUserAgent
+        privateConfig.preferences.javaScriptCanOpenWindowsAutomatically = false
+        privateConfiguration = privateConfig
+
         bookmarks = Self.loadBookmarks()
+        history = Self.loadHistory()
         newTab()
     }
 
@@ -38,18 +59,27 @@ final class BrowserStore {
         tabs.first { $0.id == selectedTabID }
     }
 
+    var canReopenClosedTab: Bool { !recentlyClosed.isEmpty }
+
     // MARK: - Tabs
 
     @discardableResult
-    func newTab(url: URL? = nil, opener: BrowserTab? = nil, select: Bool = true) -> BrowserTab {
-        let tab = BrowserTab(configuration: configuration)
+    func newTab(url: URL? = nil, opener: BrowserTab? = nil, isPrivate: Bool = false, select: Bool = true) -> BrowserTab {
+        let makePrivate = isPrivate || (opener?.isPrivate ?? false)
+        let tab = BrowserTab(
+            configuration: makePrivate ? privateConfiguration : configuration,
+            isPrivate: makePrivate
+        )
         tab.onOpenInNewTab = { [weak self, weak tab] url in
             self?.newTab(url: url, opener: tab)
+        }
+        tab.onFinishLoading = { [weak self, weak tab] in
+            if let tab { self?.recordVisit(tab) }
         }
 
         // Open next to the tab that opened it, inside the same group.
         if let opener, let index = tabs.firstIndex(where: { $0.id == opener.id }) {
-            tab.groupID = opener.groupID
+            tab.groupID = opener.isPinned ? nil : opener.groupID
             tabs.insert(tab, at: index + 1)
         } else {
             tabs.append(tab)
@@ -65,8 +95,23 @@ final class BrowserStore {
         selectedTabID = tab.id
     }
 
+    /// Selects the tab to the right (or left with `forward: false`), wrapping around.
+    func selectAdjacentTab(forward: Bool) {
+        let visible = stripItems.compactMap { item -> BrowserTab? in
+            if case .tab(let tab) = item { return tab } else { return nil }
+        }
+        guard !visible.isEmpty else { return }
+        let current = visible.firstIndex { $0.id == selectedTabID } ?? 0
+        let next = (current + (forward ? 1 : -1) + visible.count) % visible.count
+        selectedTabID = visible[next].id
+    }
+
     func close(_ tab: BrowserTab) {
         guard let index = tabs.firstIndex(where: { $0.id == tab.id }) else { return }
+        if let url = tab.url {
+            recentlyClosed.append(ClosedTab(url: url, groupID: tab.groupID, isPrivate: tab.isPrivate))
+            if recentlyClosed.count > 20 { recentlyClosed.removeFirst() }
+        }
         tab.webView.stopLoading()
         tabs.remove(at: index)
         removeEmptyGroups()
@@ -76,6 +121,43 @@ final class BrowserStore {
         } else if selectedTabID == tab.id {
             selectedTabID = tabs[min(index, tabs.count - 1)].id
         }
+    }
+
+    func closeOtherTabs(except keep: BrowserTab) {
+        for tab in tabs where tab.id != keep.id && !tab.isPinned { close(tab) }
+        selectedTabID = keep.id
+    }
+
+    func closeTabsToTheRight(of tab: BrowserTab) {
+        guard let index = tabs.firstIndex(where: { $0.id == tab.id }) else { return }
+        for other in tabs[(index + 1)...] where !other.isPinned { close(other) }
+    }
+
+    /// ⇧⌘T: brings back the most recently closed tab.
+    func reopenClosedTab() {
+        guard let closed = recentlyClosed.popLast() else { return }
+        let tab = newTab(url: closed.url, isPrivate: closed.isPrivate)
+        if let groupID = closed.groupID, groups.contains(where: { $0.id == groupID }) {
+            tab.groupID = groupID
+        }
+    }
+
+    func duplicate(_ tab: BrowserTab) {
+        newTab(url: tab.url, opener: tab)
+    }
+
+    func togglePin(_ tab: BrowserTab) {
+        tab.isPinned.toggle()
+        if tab.isPinned {
+            tab.groupID = nil
+            removeEmptyGroups()
+        }
+    }
+
+    func copyLink(of tab: BrowserTab) {
+        guard let url = tab.url else { return }
+        NSPasteboard.general.clearContents()
+        NSPasteboard.general.setString(url.absoluteString, forType: .string)
     }
 
     /// Loads whatever was typed: a web address, or a search if it isn't one.
@@ -116,13 +198,14 @@ final class BrowserStore {
 
     // MARK: - Tab groups
 
-    /// The order the tab strip draws things in. Tabs in a group are drawn
-    /// together right after their group's chip, and hidden when it's collapsed.
+    /// The order the tab strip draws things in: pinned tabs first, then
+    /// everything else. Tabs in a group are drawn together right after their
+    /// group's chip, and hidden when it's collapsed.
     var stripItems: [StripItem] {
-        var items: [StripItem] = []
+        var items: [StripItem] = tabs.filter(\.isPinned).map { StripItem.tab($0) }
         var seenGroups = Set<UUID>()
 
-        for tab in tabs {
+        for tab in tabs where !tab.isPinned {
             guard let groupID = tab.groupID,
                   let group = groups.first(where: { $0.id == groupID }) else {
                 items.append(.tab(tab))
@@ -133,7 +216,7 @@ final class BrowserStore {
 
             items.append(.group(group))
             if !group.isCollapsed {
-                items += tabs.filter { $0.groupID == groupID }.map { StripItem.tab($0) }
+                items += tabs.filter { $0.groupID == groupID && !$0.isPinned }.map { StripItem.tab($0) }
             }
         }
         return items
@@ -148,10 +231,17 @@ final class BrowserStore {
         tabs.filter { $0.groupID == group.id }.count
     }
 
+    /// How many open, unpinned tabs show the same website as this one.
+    func sameSiteTabCount(as tab: BrowserTab) -> Int {
+        guard let url = tab.url else { return 0 }
+        let site = Self.siteName(url)
+        return tabs.filter { !$0.isPinned && $0.url.map(Self.siteName) == site }.count
+    }
+
     /// Combines similar tabs: any website open in two or more ungrouped tabs
     /// gets its own group.
     func groupSimilarTabs() {
-        let ungrouped = tabs.filter { $0.groupID == nil && $0.url != nil }
+        let ungrouped = tabs.filter { $0.groupID == nil && !$0.isPinned && $0.url != nil }
         let bySite = Dictionary(grouping: ungrouped) { Self.siteName($0.url!) }
 
         for (site, siteTabs) in bySite.sorted(by: { $0.key < $1.key }) where siteTabs.count >= 2 {
@@ -161,14 +251,35 @@ final class BrowserStore {
         }
     }
 
+    /// Puts every tab from this tab's website into one group, joining the
+    /// tab's existing group if it already has one.
+    func groupTabsFromSameSite(as tab: BrowserTab) {
+        guard let url = tab.url else { return }
+        let site = Self.siteName(url)
+        let target: TabGroup
+        if let existing = group(for: tab) {
+            target = existing
+        } else {
+            target = TabGroup(name: site, color: nextGroupColor())
+            groups.append(target)
+        }
+        for other in tabs where !other.isPinned && other.url.map(Self.siteName) == site {
+            other.groupID = target.id
+        }
+        removeEmptyGroups()
+    }
+
     func addToNewGroup(_ tab: BrowserTab) {
         let name = tab.url.map(Self.siteName) ?? "New Group"
         let group = TabGroup(name: name, color: nextGroupColor())
         groups.append(group)
+        tab.isPinned = false
         tab.groupID = group.id
+        removeEmptyGroups()
     }
 
     func move(_ tab: BrowserTab, to group: TabGroup) {
+        tab.isPinned = false
         tab.groupID = group.id
         removeEmptyGroups()
     }
@@ -210,11 +321,29 @@ final class BrowserStore {
     }
 
     private func nextGroupColor() -> GroupColor {
-        GroupColor.allCases[groups.count % GroupColor.allCases.count]
+        let used = Set(groups.map(\.color))
+        return GroupColor.allCases.first { !used.contains($0) }
+            ?? GroupColor.allCases[groups.count % GroupColor.allCases.count]
     }
 
     private func removeEmptyGroups() {
         groups.removeAll { group in !tabs.contains { $0.groupID == group.id } }
+    }
+
+    // MARK: - Panels
+
+    func showSidebar(_ section: SidebarSection) {
+        if isSidebarVisible && sidebarSection == section {
+            isSidebarVisible = false
+        } else {
+            sidebarSection = section
+            isSidebarVisible = true
+        }
+    }
+
+    func showFindBar() {
+        isFindBarVisible = true
+        findBarFocusRequest += 1
     }
 
     // MARK: - Bookmarks
@@ -234,17 +363,29 @@ final class BrowserStore {
         saveBookmarks()
     }
 
+    func addBookmarksForAllTabs() {
+        for tab in tabs {
+            guard let url = tab.url, !isBookmarked(url) else { continue }
+            bookmarks.append(Bookmark(title: tab.title, url: url))
+        }
+        saveBookmarks()
+    }
+
     func removeBookmark(_ bookmark: Bookmark) {
         bookmarks.removeAll { $0.id == bookmark.id }
         saveBookmarks()
     }
 
-    func open(_ bookmark: Bookmark) {
-        if let tab = selectedTab {
-            tab.load(bookmark.url)
+    func open(_ url: URL, inNewTab: Bool = false) {
+        if !inNewTab, let tab = selectedTab {
+            tab.load(url)
         } else {
-            newTab(url: bookmark.url)
+            newTab(url: url)
         }
+    }
+
+    func open(_ bookmark: Bookmark) {
+        open(bookmark.url)
     }
 
     private static let bookmarksKey = "vela.bookmarks"
@@ -269,5 +410,45 @@ final class BrowserStore {
             Bookmark(title: "GitHub", url: URL(string: "https://github.com")!),
             Bookmark(title: "Claude", url: URL(string: "https://claude.ai")!),
         ]
+    }
+
+    // MARK: - History
+
+    private static let historyKey = "vela.history"
+    private static let historyLimit = 1000
+
+    /// Saves a visit, unless the tab is private or it's the same page as the last visit.
+    func recordVisit(_ tab: BrowserTab) {
+        guard !tab.isPrivate, let url = tab.url, url.scheme?.hasPrefix("http") == true else { return }
+        if let last = history.first, last.url == url {
+            history[0].title = tab.title
+            history[0].date = Date()
+        } else {
+            history.insert(HistoryEntry(title: tab.title, url: url, date: Date()), at: 0)
+            if history.count > Self.historyLimit { history.removeLast(history.count - Self.historyLimit) }
+        }
+        saveHistory()
+    }
+
+    func removeHistoryEntry(_ entry: HistoryEntry) {
+        history.removeAll { $0.id == entry.id }
+        saveHistory()
+    }
+
+    func clearHistory() {
+        history.removeAll()
+        saveHistory()
+    }
+
+    private func saveHistory() {
+        if let data = try? JSONEncoder().encode(history) {
+            UserDefaults.standard.set(data, forKey: Self.historyKey)
+        }
+    }
+
+    private static func loadHistory() -> [HistoryEntry] {
+        guard let data = UserDefaults.standard.data(forKey: historyKey),
+              let saved = try? JSONDecoder().decode([HistoryEntry].self, from: data) else { return [] }
+        return saved
     }
 }

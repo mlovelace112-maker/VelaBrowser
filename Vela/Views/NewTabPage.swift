@@ -10,9 +10,17 @@ struct NewTabPage: View {
 
     var body: some View {
         VStack(spacing: 28) {
-            Text(greeting)
-                .font(.system(size: 44, weight: .semibold, design: .rounded))
-                .foregroundStyle(.white)
+            VStack(spacing: 8) {
+                Text(tab.isPrivate ? "Private Browsing" : greeting)
+                    .font(.system(size: 44, weight: .semibold, design: .rounded))
+                    .foregroundStyle(.white)
+                if tab.isPrivate {
+                    Text("Vela won't remember the pages you visit, your searches or your cookies after you quit Vela.")
+                        .font(.system(size: 13))
+                        .foregroundStyle(Nightglass.mutedText)
+                        .multilineTextAlignment(.center)
+                }
+            }
 
             HStack(spacing: 12) {
                 Image(systemName: "sparkle")

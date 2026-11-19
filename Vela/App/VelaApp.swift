@@ -23,35 +23,90 @@ struct VelaApp: App {
     }
 }
 
-/// Menu bar items and keyboard shortcuts (⌘T, ⌘L, ⌘R, ...).
+/// Menu bar items and keyboard shortcuts. Most match Safari's.
 struct BrowserCommands: Commands {
     let store: BrowserStore
 
     var body: some Commands {
+        // File menu
         CommandGroup(replacing: .newItem) {
             Button("New Tab") { store.newTab() }
                 .keyboardShortcut("t")
-        }
-        CommandMenu("Navigate") {
-            Button("Open Location") { store.addressBarFocusRequest += 1 }
+            Button("New Private Tab") { store.newTab(isPrivate: true) }
+                .keyboardShortcut("n", modifiers: [.command, .shift])
+            Button("Reopen Closed Tab") { store.reopenClosedTab() }
+                .keyboardShortcut("t", modifiers: [.command, .shift])
+            Button("Close Tab") {
+                if let tab = store.selectedTab { store.close(tab) }
+            }
+            .keyboardShortcut("w", modifiers: [.command, .shift])
+            Divider()
+            Button("Open Location…") { store.addressBarFocusRequest += 1 }
                 .keyboardShortcut("l")
+        }
+
+        // Edit menu: Find
+        CommandGroup(after: .textEditing) {
+            Button("Find on Page…") { store.showFindBar() }
+                .keyboardShortcut("f")
+        }
+
+        // View menu: sidebar and zoom
+        CommandGroup(before: .toolbar) {
+            Button(store.isSidebarVisible ? "Hide Sidebar" : "Show Sidebar") {
+                store.isSidebarVisible.toggle()
+            }
+            .keyboardShortcut("l", modifiers: [.command, .shift])
+            Divider()
+            Button("Zoom In") { store.selectedTab?.zoomIn() }
+                .keyboardShortcut("=")
+            Button("Zoom Out") { store.selectedTab?.zoomOut() }
+                .keyboardShortcut("-")
+            Button("Actual Size") { store.selectedTab?.resetZoom() }
+                .keyboardShortcut("0")
             Button("Reload Page") { store.selectedTab?.webView.reload() }
                 .keyboardShortcut("r")
+            Divider()
+        }
+
+        // History menu
+        CommandMenu("History") {
             Button("Back") { store.selectedTab?.webView.goBack() }
                 .keyboardShortcut("[")
             Button("Forward") { store.selectedTab?.webView.goForward() }
                 .keyboardShortcut("]")
             Divider()
-            Button("Bookmark This Page") {
+            Button("Show All History") { store.showSidebar(.history) }
+                .keyboardShortcut("y")
+            Button("Clear History") { store.clearHistory() }
+        }
+
+        // Bookmarks menu
+        CommandMenu("Bookmarks") {
+            Button("Show Bookmarks") { store.showSidebar(.bookmarks) }
+                .keyboardShortcut("b", modifiers: [.command, .option])
+            Button("Add Bookmark") {
                 if let tab = store.selectedTab { store.toggleBookmark(for: tab) }
             }
             .keyboardShortcut("d")
+            Button("Bookmark All Tabs") { store.addBookmarksForAllTabs() }
+        }
+
+        // Tabs menu
+        CommandMenu("Tabs") {
+            Button("Show Next Tab") { store.selectAdjacentTab(forward: true) }
+                .keyboardShortcut("]", modifiers: [.command, .shift])
+            Button("Show Previous Tab") { store.selectAdjacentTab(forward: false) }
+                .keyboardShortcut("[", modifiers: [.command, .shift])
+            Divider()
             Button("Group Similar Tabs") { store.groupSimilarTabs() }
                 .keyboardShortcut("g", modifiers: [.command, .shift])
-            Button("Close Tab") {
-                if let tab = store.selectedTab { store.close(tab) }
+            Button("Pin Tab") {
+                if let tab = store.selectedTab { store.togglePin(tab) }
             }
-            .keyboardShortcut("w", modifiers: [.command, .shift])
+            Button("Duplicate Tab") {
+                if let tab = store.selectedTab { store.duplicate(tab) }
+            }
         }
     }
 }

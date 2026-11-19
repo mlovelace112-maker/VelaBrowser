@@ -14,6 +14,8 @@ import WebKit
 final class BrowserTab: Identifiable {
     let id = UUID()
     let webView: WKWebView
+    /// Private tabs keep no history, cookies or cache after they close.
+    let isPrivate: Bool
 
     var title = "New Tab"
     var url: URL?
@@ -23,17 +25,25 @@ final class BrowserTab: Identifiable {
     var progress: Double = 0
     /// Which tab group this tab belongs to, if any.
     var groupID: UUID?
+    /// Pinned tabs stay small at the left of the tab strip.
+    var isPinned = false
+
+    /// Page zoom: 1.0 is 100%. Change it with zoomIn(), zoomOut() or resetZoom().
+    private(set) var zoom: Double = 1
 
     /// Called when a page asks to open a link in a new window/tab.
     @ObservationIgnored var onOpenInNewTab: (@MainActor (URL) -> Void)?
+    /// Called when a page finishes loading (used to record History).
+    @ObservationIgnored var onFinishLoading: (@MainActor () -> Void)?
 
     private let coordinator: TabCoordinator
     @ObservationIgnored private var observations: [NSKeyValueObservation] = []
 
-    init(configuration: WKWebViewConfiguration) {
+    init(configuration: WKWebViewConfiguration, isPrivate: Bool = false) {
         webView = WKWebView(frame: .zero, configuration: configuration)
         webView.allowsBackForwardNavigationGestures = true
         webView.allowsMagnification = true
+        self.isPrivate = isPrivate
         coordinator = TabCoordinator()
 
         coordinator.tab = self
@@ -54,6 +64,16 @@ final class BrowserTab: Identifiable {
     func load(_ url: URL) {
         self.url = url
         webView.load(URLRequest(url: url))
+    }
+
+    func zoomIn() { setZoom(zoom + 0.1) }
+    func zoomOut() { setZoom(zoom - 0.1) }
+    func resetZoom() { setZoom(1) }
+
+    private func setZoom(_ value: Double) {
+        // Round to whole percents so 0.1 steps don't drift (e.g. 1.2000000002).
+        zoom = (min(max(value, 0.5), 3) * 100).rounded() / 100
+        webView.pageZoom = zoom
     }
 
     private func watch<Value>(_ keyPath: KeyPath<WKWebView, Value>) -> NSKeyValueObservation {
@@ -98,5 +118,9 @@ final class TabCoordinator: NSObject, WKNavigationDelegate, WKUIDelegate {
             tab?.onOpenInNewTab?(url)
         }
         return nil
+    }
+
+    func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
+        tab?.onFinishLoading?()
     }
 }

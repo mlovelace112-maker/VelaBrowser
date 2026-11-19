@@ -42,7 +42,7 @@ struct TabStripView: View {
     }
 }
 
-/// One tab in the strip.
+/// One tab in the strip. Pinned tabs shrink to just their icon.
 struct TabChip: View {
     @Environment(BrowserStore.self) private var store
     let tab: BrowserTab
@@ -54,26 +54,41 @@ struct TabChip: View {
         let shape = RoundedRectangle(cornerRadius: 9, style: .continuous)
 
         HStack(spacing: 8) {
-            FaviconView(url: tab.url)
-            Text(tab.title)
-                .font(.system(size: 12.5))
-                .foregroundStyle(isSelected ? Nightglass.text : Nightglass.mutedText)
-                .lineLimit(1)
-                .truncationMode(.tail)
-            Spacer(minLength: 0)
-            if isHovering || isSelected {
-                Button { store.close(tab) } label: {
-                    Image(systemName: "xmark").font(.system(size: 9, weight: .bold))
+            ZStack(alignment: .bottomTrailing) {
+                FaviconView(url: tab.url)
+                if tab.isPrivate {
+                    Image(systemName: "eyeglasses")
+                        .font(.system(size: 7, weight: .bold))
+                        .foregroundStyle(.white)
+                        .padding(1.5)
+                        .background(Circle().fill(Nightglass.accent))
+                        .offset(x: 5, y: 4)
                 }
-                .buttonStyle(IconButtonStyle(size: 18))
-                .help("Close Tab")
+            }
+            if !tab.isPinned {
+                Text(tab.title)
+                    .font(.system(size: 12.5))
+                    .foregroundStyle(isSelected ? Nightglass.text : Nightglass.mutedText)
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+                Spacer(minLength: 0)
+                if isHovering || isSelected {
+                    Button { store.close(tab) } label: {
+                        Image(systemName: "xmark").font(.system(size: 9, weight: .bold))
+                    }
+                    .buttonStyle(IconButtonStyle(size: 18))
+                    .help("Close Tab (⇧⌘W)")
+                }
             }
         }
-        .padding(.horizontal, 10)
-        .frame(minWidth: 90, maxWidth: 200)
+        .padding(.horizontal, tab.isPinned ? 0 : 10)
+        .frame(width: tab.isPinned ? 36 : nil)
+        .frame(minWidth: tab.isPinned ? 36 : 90, maxWidth: tab.isPinned ? 36 : 200)
         .frame(height: 30)
         .background(shape.fill(Color.white.opacity(isSelected ? 0.12 : (isHovering ? 0.06 : 0))))
-        .overlay(shape.strokeBorder(Color.white.opacity(isSelected ? 0.14 : 0)))
+        .overlay(shape.strokeBorder(
+            tab.isPrivate ? Nightglass.accent.opacity(isSelected ? 0.6 : 0.3) : Color.white.opacity(isSelected ? 0.14 : 0)
+        ))
         .overlay(alignment: .bottom) {
             if let group {
                 Capsule().fill(group.color.color).frame(height: 2).padding(.horizontal, 10)
@@ -84,27 +99,81 @@ struct TabChip: View {
         .onTapGesture { store.select(tab) }
         .onHover { isHovering = $0 }
         .animation(.easeOut(duration: 0.15), value: isHovering)
+        .help(tab.isPinned ? tab.title : "")
         .accessibilityElement(children: .contain)
         .accessibilityLabel(tab.title)
         .accessibilityAddTraits(.isButton)
-        .contextMenu {
-            Button("New Tab to the Right") { store.newTab(opener: tab) }
-            Divider()
-            if tab.groupID == nil {
-                Button("Add to New Group") { withAnimation(Nightglass.spring) { store.addToNewGroup(tab) } }
-            } else {
-                Button("Remove from Group") { withAnimation(Nightglass.spring) { store.removeFromGroup(tab) } }
+        .contextMenu { TabContextMenu(tab: tab) }
+    }
+}
+
+/// Everything you can do to a tab with a right-click.
+struct TabContextMenu: View {
+    @Environment(BrowserStore.self) private var store
+    let tab: BrowserTab
+
+    var body: some View {
+        let site = tab.url.map(BrowserStore.siteName)
+        let sameSiteCount = store.sameSiteTabCount(as: tab)
+
+        Button("New Tab to the Right") { store.newTab(opener: tab) }
+        Button("Duplicate Tab") { store.duplicate(tab) }
+            .disabled(tab.url == nil)
+        Button("Reload Tab") { tab.webView.reload() }
+            .disabled(tab.url == nil)
+        Button(tab.isPinned ? "Unpin Tab" : "Pin Tab") {
+            withAnimation(Nightglass.spring) { store.togglePin(tab) }
+        }
+
+        Divider()
+
+        // Grouping
+        if let site, sameSiteCount >= 2 {
+            Button("Group All \(site) Tabs (\(sameSiteCount))") {
+                withAnimation(Nightglass.spring) { store.groupTabsFromSameSite(as: tab) }
             }
-            if !store.groups.isEmpty {
-                Menu("Move to Group") {
-                    ForEach(store.groups) { target in
-                        Button(target.name) { withAnimation(Nightglass.spring) { store.move(tab, to: target) } }
+        }
+        Button("Group Similar Tabs") {
+            withAnimation(Nightglass.spring) { store.groupSimilarTabs() }
+        }
+        if tab.groupID == nil {
+            Button("Add to New Group") {
+                withAnimation(Nightglass.spring) { store.addToNewGroup(tab) }
+            }
+        } else {
+            Button("Remove from Group") {
+                withAnimation(Nightglass.spring) { store.removeFromGroup(tab) }
+            }
+        }
+        let otherGroups = store.groups.filter { $0.id != tab.groupID }
+        if !otherGroups.isEmpty {
+            Menu("Move to Group") {
+                ForEach(otherGroups) { target in
+                    Button(target.name) {
+                        withAnimation(Nightglass.spring) { store.move(tab, to: target) }
                     }
                 }
             }
-            Divider()
-            Button("Close Tab") { store.close(tab) }
         }
+
+        Divider()
+
+        Button(store.isBookmarked(tab.url) ? "Remove Bookmark" : "Bookmark This Tab") {
+            store.toggleBookmark(for: tab)
+        }
+        .disabled(tab.url == nil)
+        Button("Copy Link") { store.copyLink(of: tab) }
+            .disabled(tab.url == nil)
+        if let url = tab.url {
+            ShareLink("Share…", item: url)
+        }
+
+        Divider()
+
+        Button("Close Tab") { withAnimation(Nightglass.spring) { store.close(tab) } }
+        Button("Close Other Tabs") { withAnimation(Nightglass.spring) { store.closeOtherTabs(except: tab) } }
+            .disabled(store.tabs.count < 2)
+        Button("Close Tabs to the Right") { withAnimation(Nightglass.spring) { store.closeTabsToTheRight(of: tab) } }
     }
 }
 
