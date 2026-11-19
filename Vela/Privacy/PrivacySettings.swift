@@ -68,6 +68,9 @@ struct PrivacySettings: Codable, Equatable {
     var keptSites: Set<String> = []
     /// Sites where you've turned the shield off because something didn't work.
     var shieldsDownSites: Set<String> = []
+    /// Sites where you chose "Allow Sign-In": they keep every cookie, including
+    /// the ones a sign-in service sets inside them, so logging in works.
+    var signInSites: Set<String> = []
 
     // Scripts
     var scriptLevel: ScriptLevel = .allowAll
@@ -103,6 +106,7 @@ struct PrivacySettings: Codable, Equatable {
             blockThirdPartyCookies: blockThirdPartyCookies,
             upgradeToHTTPS: upgradeToHTTPS,
             shieldsDownSites: shieldsDownSites,
+            signInSites: signInSites,
             scriptLevel: scriptLevel,
             siteScriptLevels: siteScriptLevels
         )
@@ -135,6 +139,7 @@ struct PrivacySettings: Codable, Equatable {
         let blockThirdPartyCookies: Bool
         let upgradeToHTTPS: Bool
         let shieldsDownSites: Set<String>
+        let signInSites: Set<String>
         let scriptLevel: ScriptLevel
         let siteScriptLevels: [String: ScriptLevel]
     }
@@ -156,6 +161,7 @@ struct PrivacySettings: Codable, Equatable {
         clearCookiesOnQuit = try c.decodeIfPresent(Bool.self, forKey: .clearCookiesOnQuit) ?? d.clearCookiesOnQuit
         keptSites = try c.decodeIfPresent(Set<String>.self, forKey: .keptSites) ?? d.keptSites
         shieldsDownSites = try c.decodeIfPresent(Set<String>.self, forKey: .shieldsDownSites) ?? d.shieldsDownSites
+        signInSites = try c.decodeIfPresent(Set<String>.self, forKey: .signInSites) ?? d.signInSites
         scriptLevel = try c.decodeIfPresent(ScriptLevel.self, forKey: .scriptLevel) ?? d.scriptLevel
         siteScriptLevels = try c.decodeIfPresent([String: ScriptLevel].self, forKey: .siteScriptLevels) ?? d.siteScriptLevels
         linkCheckerEnabled = try c.decodeIfPresent(Bool.self, forKey: .linkCheckerEnabled) ?? d.linkCheckerEnabled

@@ -65,6 +65,7 @@ To update later: pull the new code and run the same command.
 | Turn the shield off for one site | Click the shield and flip its switch, for when a site doesn't work right. You can turn it back on later in Settings (⌘,). |
 | Pop-up blocker | Pop-ups you didn't click for are blocked. A "Pop-up blocked · Allow once" notice appears at the bottom of the window. |
 | Third-party cookies | Blocked by default, so ad companies can't follow you from site to site. |
+| Allow sign-in | School and work logins (Auth0, Okta, Microsoft, Google and others) keep their cookies automatically. If a site still sends you back to its login page, click the shield and turn on **Allow sign-in** for that site. Ads and trackers stay blocked. |
 | HTTPS upgrade | Insecure `http://` requests are switched to secure `https://`. |
 | Cookie manager | Open it from the shield panel or press ⌥⌘K. It shows every site's cookies, with trackers listed first. Delete one site, all trackers or everything. Mark a site **Keep** to stay signed in. |
 | Clear cookies on quit | Turn this on in the cookie manager or Settings. When Vela quits, it deletes every site's data except the sites marked Keep. |

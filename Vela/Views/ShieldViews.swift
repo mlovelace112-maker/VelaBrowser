@@ -122,6 +122,25 @@ struct ShieldPopover: View {
                 }
             }
 
+            if tab.url != nil {
+                VStack(alignment: .leading, spacing: 6) {
+                    Toggle(isOn: Binding(
+                        get: { store.allowsSignIn(for: tab) },
+                        set: { _ in store.toggleSignIn(for: tab) }
+                    )) {
+                        Text("Allow sign-in on \(site)")
+                            .font(.system(size: 12.5, weight: .medium))
+                    }
+                    .toggleStyle(.switch)
+                    .controlSize(.small)
+                    .tint(Nightglass.accent)
+                    Text("Trouble logging in? This lets sign-in cookies through while ads and trackers stay blocked.")
+                        .font(.system(size: 11.5))
+                        .foregroundStyle(Nightglass.mutedText)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+            }
+
             Divider()
 
             PrivacyControls()

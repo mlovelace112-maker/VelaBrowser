@@ -91,9 +91,15 @@ enum ContentBlocker {
         }
 
         // 5. Third-party cookies: sites can't follow you around using cookies set inside other sites.
+        //    Sites where you chose "Allow Sign-In" are skipped ("unless-top-url"),
+        //    so a sign-in box from another company still works on them.
         if settings.blockThirdPartyCookies {
+            var cookieTrigger: [String: Any] = ["url-filter": ".*", "load-type": ["third-party"]]
+            if !settings.signInSites.isEmpty {
+                cookieTrigger["unless-top-url"] = settings.signInSites.sorted().map(urlPattern(for:))
+            }
             rules.append([
-                "trigger": ["url-filter": ".*", "load-type": ["third-party"]] as [String: Any],
+                "trigger": cookieTrigger,
                 "action": ["type": "block-cookies"],
             ])
         }
@@ -101,8 +107,10 @@ enum ContentBlocker {
         // 5b. Sign-in services ("Sign in with Google" and friends) need their own
         //     cookies inside other sites' sign-in buttons, or logging in breaks.
         //     "ignore-previous-rules" undoes everything above for just these addresses.
+        //     Your own "Allow Sign-In" sites are added here too, so their sign-in
+        //     pages keep their cookies when another site shows them.
         if !rules.isEmpty {
-            for domain in signInDomains {
+            for domain in signInDomains + settings.signInSites.sorted() {
                 rules.append([
                     "trigger": ["url-filter": urlPattern(for: domain)],
                     "action": ["type": "ignore-previous-rules"],
@@ -403,8 +411,14 @@ enum ContentBlocker {
     ]
 
     /// "Sign in with Google / Apple / Microsoft" services that keep their cookies.
+    /// Also the big "single sign-on" companies that schools and workplaces use
+    /// (Auth0, Okta, OneLogin, Duo, Ping, Microsoft Entra), which bounce you
+    /// between their own address and your school's site while you log in.
     static let signInDomains: [String] = [
         "accounts.google.com", "appleid.apple.com", "login.microsoftonline.com", "login.live.com",
+        "login.windows.net", "microsoftonline.com", "b2clogin.com",
+        "auth0.com", "okta.com", "oktapreview.com", "onelogin.com",
+        "duosecurity.com", "pingone.com", "pingidentity.com",
     ]
 
     /// Parts of web addresses that only ads use. Aggressive mode blocks these

@@ -167,6 +167,20 @@ struct PrivacySettingsTab: View {
                 LabeledContent("Trackers and ads", value: "\(store.trackersBlockedTotal)")
                 LabeledContent("Pop-ups", value: "\(store.popupsBlockedTotal)")
             }
+            if !store.privacy.signInSites.isEmpty {
+                Section("Sign-in allowed on") {
+                    ForEach(store.privacy.signInSites.sorted(), id: \.self) { site in
+                        HStack {
+                            Text(site)
+                            Spacer()
+                            Button("Remove") {
+                                store.updatePrivacy { $0.signInSites.remove(site) }
+                            }
+                            .controlSize(.small)
+                        }
+                    }
+                }
+            }
             if !store.privacy.shieldsDownSites.isEmpty {
                 Section("Shield turned off for") {
                     ForEach(store.privacy.shieldsDownSites.sorted(), id: \.self) { site in

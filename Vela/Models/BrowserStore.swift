@@ -570,6 +570,26 @@ final class BrowserStore {
         }
     }
 
+    /// Whether "Allow Sign-In" is on for the tab's website.
+    func allowsSignIn(for tab: BrowserTab) -> Bool {
+        guard let url = tab.url else { return false }
+        return privacy.signInSites.contains(Self.siteName(url))
+    }
+
+    /// Lets the tab's website keep sign-in cookies from other companies
+    /// (or stops it), then reloads. Ads and trackers stay blocked.
+    func toggleSignIn(for tab: BrowserTab) {
+        guard let url = tab.url else { return }
+        let site = Self.siteName(url)
+        updatePrivacy(reloading: tab) { settings in
+            if settings.signInSites.contains(site) {
+                settings.signInSites.remove(site)
+            } else {
+                settings.signInSites.insert(site)
+            }
+        }
+    }
+
     /// The script slider position for this tab's website.
     func scriptLevel(for tab: BrowserTab) -> ScriptLevel {
         privacy.scriptLevel(for: tab.url.map(Self.siteName))
