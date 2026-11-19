@@ -81,6 +81,9 @@ struct PrivacySettings: Codable, Equatable {
     /// Fingerprinting protection: blurs the small details (canvas drawing,
     /// audio, hardware) that sites combine to recognize your Mac without cookies.
     var fingerprintProtection = true
+    /// Show DuckDuckGo's search ideas under the address bar as you type.
+    /// (Sends what you type to DuckDuckGo; never in private tabs.)
+    var searchSuggestions = true
 
     // Site permissions
     /// Sites allowed to open pop-ups even with "Block pop-ups" on.
@@ -199,6 +202,7 @@ struct PrivacySettings: Codable, Equatable {
         shieldsDownSites = try c.decodeIfPresent(Set<String>.self, forKey: .shieldsDownSites) ?? d.shieldsDownSites
         signInSites = try c.decodeIfPresent(Set<String>.self, forKey: .signInSites) ?? d.signInSites
         fingerprintProtection = try c.decodeIfPresent(Bool.self, forKey: .fingerprintProtection) ?? d.fingerprintProtection
+        searchSuggestions = try c.decodeIfPresent(Bool.self, forKey: .searchSuggestions) ?? d.searchSuggestions
         popupAllowedSites = try c.decodeIfPresent(Set<String>.self, forKey: .popupAllowedSites) ?? d.popupAllowedSites
         cameraSites = try c.decodeIfPresent([String: Bool].self, forKey: .cameraSites) ?? d.cameraSites
         microphoneSites = try c.decodeIfPresent([String: Bool].self, forKey: .microphoneSites) ?? d.microphoneSites

@@ -13,6 +13,7 @@ struct ContentView: View {
             VStack(spacing: 0) {
                 TabStripView()
                 ToolbarView()
+                    .zIndex(1)
                 if Appearance.shared.settings.showBookmarksBar {
                     BookmarksBarView()
                 }
@@ -26,6 +27,8 @@ struct ContentView: View {
             .overlay(alignment: .bottom) {
                 Rectangle().fill(Nightglass.stroke).frame(height: 1)
             }
+            // Draw above the page, so address bar suggestions can hang over it.
+            .zIndex(1)
 
             HStack(spacing: 0) {
                 if store.isSidebarVisible {

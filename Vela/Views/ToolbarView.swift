@@ -204,6 +204,11 @@ struct AddressBar: View {
     /// What you last typed, kept so "Ask Claude" works even if clicking it
     /// takes focus away from the address bar first.
     @State private var typed = ""
+    /// Suggestions from your tabs, bookmarks, history and DuckDuckGo.
+    @State private var suggestions = SuggestionEngine()
+    /// Stays true for a moment after the address bar loses focus, so a
+    /// click on a suggestion still lands.
+    @State private var showsSuggestions = false
 
     var body: some View {
         let shape = RoundedRectangle(cornerRadius: 11, style: .continuous)
@@ -229,8 +234,31 @@ struct AddressBar: View {
                 .foregroundStyle(Nightglass.text)
                 .focused($isFocused)
                 .onSubmit {
-                    store.navigate(text, in: tab)
-                    isFocused = false
+                    if let pick = suggestions.selectedItem {
+                        open(pick)
+                    } else {
+                        store.navigate(text, in: tab)
+                        isFocused = false
+                    }
+                }
+                // ↑ and ↓ move through the suggestions, Esc closes them.
+                .onKeyPress(.downArrow) {
+                    guard showsSuggestions, !suggestions.items.isEmpty else { return .ignored }
+                    suggestions.moveSelection(by: 1)
+                    return .handled
+                }
+                .onKeyPress(.upArrow) {
+                    guard showsSuggestions, !suggestions.items.isEmpty else { return .ignored }
+                    suggestions.moveSelection(by: -1)
+                    return .handled
+                }
+                .onKeyPress(.escape) {
+                    guard showsSuggestions, !suggestions.items.isEmpty else {
+                        isFocused = false
+                        return .handled
+                    }
+                    suggestions.clear()
+                    return .handled
                 }
                 // Tab sends what you typed to Claude instead of searching.
                 .onKeyPress(.tab) {
@@ -312,7 +340,34 @@ struct AddressBar: View {
         .shadow(color: Nightglass.accent.opacity(isFocused ? 0.3 : 0), radius: 10)
         .animation(.easeOut(duration: 0.2), value: isFocused)
         .animation(.easeOut(duration: 0.15), value: isFocused && canAsk)
-        .onChange(of: text) { if isFocused { typed = text } }
+        .overlay(alignment: .topLeading) {
+            if showsSuggestions && !suggestions.items.isEmpty {
+                SuggestionList(engine: suggestions, onPick: open)
+                    .offset(y: 40)
+                    .transition(.opacity.combined(with: .move(edge: .top)))
+            }
+        }
+        .animation(.easeOut(duration: 0.12), value: showsSuggestions && !suggestions.items.isEmpty)
+        .onChange(of: text) {
+            if isFocused {
+                typed = text
+                if text != displayText { suggestions.update(for: text, store: store, tab: tab) }
+            }
+        }
+        .onChange(of: isFocused) {
+            if isFocused {
+                showsSuggestions = true
+            } else {
+                // Wait a moment so a click on a suggestion still counts.
+                Task {
+                    try? await Task.sleep(for: .milliseconds(200))
+                    if !isFocused {
+                        showsSuggestions = false
+                        suggestions.clear()
+                    }
+                }
+            }
+        }
         .onAppear { text = displayText }
         .onChange(of: tab.url) { if !isFocused { text = displayText } }
         .onChange(of: tab.id) { text = displayText }
@@ -324,6 +379,21 @@ struct AddressBar: View {
     private var canAsk: Bool {
         let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
         return !trimmed.isEmpty && trimmed != displayText
+    }
+
+    /// Opens a suggestion: switches to an open tab, or loads the page or search.
+    private func open(_ suggestion: Suggestion) {
+        suggestions.clear()
+        showsSuggestions = false
+        isFocused = false
+        if case .tab(let id) = suggestion.kind, let other = store.tabs.first(where: { $0.id == id }) {
+            store.select(other)
+            text = displayText
+            // A brand-new empty tab isn't needed once you've switched away.
+            if tab.url == nil, tab.mediaSearch == nil, store.tabs.count > 1 { store.close(tab) }
+        } else if let url = suggestion.url {
+            tab.load(url)
+        }
     }
 
     private func askClaude() {
@@ -380,5 +450,76 @@ private struct LoginPicker: View {
         }
         .padding(.vertical, 10)
         .frame(minWidth: 220)
+    }
+}
+
+/// The list under the address bar while you type.
+private struct SuggestionList: View {
+    let engine: SuggestionEngine
+    let onPick: (Suggestion) -> Void
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 2) {
+            ForEach(Array(engine.items.enumerated()), id: \.element.id) { index, item in
+                if index > 0, item.kind == .search, engine.items[index - 1].kind != .search {
+                    Text("DuckDuckGo")
+                        .font(.system(size: 10.5, weight: .semibold))
+                        .foregroundStyle(Nightglass.mutedText)
+                        .padding(.horizontal, 10)
+                        .padding(.top, 6)
+                }
+                SuggestionRow(item: item, isSelected: engine.selected == index, isTopHit: index == 0 && engine.selected == 0)
+                    .contentShape(Rectangle())
+                    .onTapGesture { onPick(item) }
+                    .onHover { if $0 { engine.selected = index } }
+            }
+        }
+        .padding(6)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .glassPanel(cornerRadius: 12)
+        .shadow(color: .black.opacity(0.45), radius: 18, y: 10)
+    }
+}
+
+private struct SuggestionRow: View {
+    let item: Suggestion
+    let isSelected: Bool
+    let isTopHit: Bool
+
+    var body: some View {
+        HStack(spacing: 10) {
+            Image(systemName: item.icon)
+                .font(.system(size: 11, weight: .semibold))
+                .foregroundStyle(item.kind == .bookmark ? Nightglass.caution : Nightglass.mutedText)
+                .frame(width: 18)
+                .accessibilityHidden(true)
+            VStack(alignment: .leading, spacing: 1) {
+                Text(item.title.isEmpty ? item.detail : item.title)
+                    .font(.system(size: 13))
+                    .foregroundStyle(Nightglass.text)
+                    .lineLimit(1)
+                if !item.detail.isEmpty, !item.title.isEmpty {
+                    Text(item.detail)
+                        .font(.system(size: 11))
+                        .foregroundStyle(Nightglass.mutedText)
+                        .lineLimit(1)
+                        .truncationMode(.middle)
+                }
+            }
+            Spacer(minLength: 0)
+            if isTopHit {
+                Text("Top Hit  ↩")
+                    .font(.system(size: 10.5, weight: .semibold))
+                    .foregroundStyle(Nightglass.accent)
+            }
+        }
+        .padding(.horizontal, 10)
+        .padding(.vertical, 6)
+        .background(
+            RoundedRectangle(cornerRadius: 8, style: .continuous)
+                .fill(isSelected ? Nightglass.accent.opacity(0.22) : Color.clear)
+        )
+        .accessibilityElement(children: .combine)
+        .accessibilityAddTraits(.isButton)
     }
 }

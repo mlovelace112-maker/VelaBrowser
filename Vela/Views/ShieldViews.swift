@@ -213,6 +213,9 @@ struct PrivacyControls: View {
             SettingRow("Fingerprinting protection") {
                 Toggle("Fingerprinting protection", isOn: store.privacyBinding(\.fingerprintProtection))
             }
+            SettingRow("DuckDuckGo suggestions as I type") {
+                Toggle("DuckDuckGo suggestions as I type", isOn: store.privacyBinding(\.searchSuggestions))
+            }
         }
         .toggleStyle(.switch)
         .tint(Nightglass.accent)
