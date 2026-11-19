@@ -42,6 +42,7 @@ FILTER=(grep -E "^(\*\*|error|warning: .*Vela)")
 # Sparkle (the updater) comes from Swift Package Manager, which needs a scheme.
 # SourcePackages is kept in ./build so the release pipeline can find
 # Sparkle's signing tool there.
+set +e
 xcodebuild \
   -project Vela.xcodeproj \
   -scheme Vela \
@@ -51,10 +52,15 @@ xcodebuild \
   -allowProvisioningUpdates \
   "${SIGNING[@]}" \
   ${VERSIONING[@]+"${VERSIONING[@]}"} \
-  build | "${FILTER[@]}" || true
+  build | "${FILTER[@]}"
+# The exit status of xcodebuild itself (not of the filter after it).
+STATUS=${PIPESTATUS[0]}
+set -e
 
 APP="$BUILD/Release/Vela.app"
-if [[ ! -d "$APP" ]]; then
+# Xcode creates Vela.app before compiling, so an app folder alone doesn't
+# mean the build worked. Check xcodebuild's result and the program inside.
+if [[ $STATUS -ne 0 || ! -x "$APP/Contents/MacOS/Vela" ]]; then
   echo "✗ The build failed. Open Vela.xcodeproj in Xcode and press ⌘B to see the errors."
   exit 1
 fi

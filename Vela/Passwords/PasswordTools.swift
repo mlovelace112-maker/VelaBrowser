@@ -79,6 +79,7 @@ enum PasswordImporter {
     }
 
     /// "https://www.example.com/login" → "example.com"; plain "example.com" works too.
+    @MainActor
     static func host(from address: String) -> String? {
         guard !address.isEmpty else { return nil }
         let withScheme = address.contains("://") ? address : "https://" + address
