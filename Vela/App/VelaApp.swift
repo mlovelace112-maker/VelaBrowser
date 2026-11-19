@@ -60,6 +60,8 @@ struct BrowserCommands: Commands {
             Divider()
             Button("Manage Cookies and Site Data…") { store.isCookieManagerVisible = true }
                 .keyboardShortcut("k", modifiers: [.command, .option])
+            Button("Passwords…") { store.isPasswordsVisible = true }
+                .keyboardShortcut("p", modifiers: [.command, .option])
         }
 
         // Edit menu: Find

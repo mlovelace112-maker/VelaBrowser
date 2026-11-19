@@ -36,6 +36,13 @@ final class BrowserStore {
     var blockedPopup: BlockedPopup?
     var isCookieManagerVisible = false
     let cookieManager = CookieManager()
+
+    // Security
+    let downloadManager = DownloadManager()
+    let passwordVault = PasswordVault()
+    var isPasswordsVisible = false
+    /// "Save password?" waiting for an answer.
+    var passwordPrompt: PasswordPrompt?
     /// The compiled blocking rules every tab uses.
     @ObservationIgnored private var ruleList: WKContentRuleList?
 
@@ -61,6 +68,7 @@ final class BrowserStore {
         bookmarks = Self.loadBookmarks()
         history = Self.loadHistory()
         applyPopupSetting()
+        downloadManager.settings = { [weak self] in self?.privacy ?? PrivacySettings() }
         newTab()
         Task { await refreshBlockingRules() }
     }
@@ -79,8 +87,10 @@ final class BrowserStore {
         let tab = BrowserTab(
             configuration: makePrivate ? privateConfiguration : configuration,
             isPrivate: makePrivate,
-            ruleList: ruleList
+            ruleList: ruleList,
+            privacy: privacy
         )
+        tab.settings = { [weak self] in self?.privacy ?? PrivacySettings() }
         tab.onOpenInNewTab = { [weak self, weak tab] url in
             self?.newTab(url: url, opener: tab)
         }
@@ -90,8 +100,17 @@ final class BrowserStore {
         tab.onTrackerFound = { [weak self, weak tab] domain in
             if let tab { self?.recordTracker(domain, in: tab) }
         }
-        tab.onPopupBlocked = { [weak self, weak tab] url in
-            if let tab { self?.recordBlockedPopup(url, in: tab) }
+        tab.onPopupBlocked = { [weak self, weak tab] url, isPopUnder in
+            if let tab { self?.recordBlockedPopup(url, isPopUnder: isPopUnder, in: tab) }
+        }
+        tab.onDownload = { [weak self, weak tab] download in
+            self?.downloadManager.track(download, pageURL: tab?.url)
+        }
+        tab.onLoginFormFound = { [weak self, weak tab] host in
+            if let tab, let self { tab.savedLogins = self.passwordVault.entries(for: host) }
+        }
+        tab.onLoginSubmitted = { [weak self, weak tab] host, username, password in
+            if let tab { self?.offerToSave(host: host, username: username, password: password, from: tab) }
         }
 
         // Open next to the tab that opened it, inside the same group.
@@ -365,15 +384,24 @@ final class BrowserStore {
 
     // MARK: - Privacy shield
 
-    /// Changes privacy settings, saves them, and rebuilds the blocking rules if needed.
-    func updatePrivacy(_ change: (inout PrivacySettings) -> Void) {
+    /// Changes privacy settings, saves them, and rebuilds the blocking rules
+    /// and page scripts if needed. Pass a tab to reload it once the new rules are ready.
+    func updatePrivacy(reloading tab: BrowserTab? = nil, _ change: (inout PrivacySettings) -> Void) {
         let old = privacy
         change(&privacy)
         guard privacy != old else { return }
         privacy.save()
         if privacy.blockPopups != old.blockPopups { applyPopupSetting() }
+        if privacy.scriptInputs != old.scriptInputs {
+            for tab in tabs { tab.installScripts(for: privacy) }
+        }
         if privacy.ruleInputs != old.ruleInputs {
-            Task { await refreshBlockingRules() }
+            Task {
+                await refreshBlockingRules()
+                tab?.webView.reload()
+            }
+        } else {
+            tab?.webView.reload()
         }
     }
 
@@ -399,16 +427,27 @@ final class BrowserStore {
     func toggleShields(for tab: BrowserTab) {
         guard let url = tab.url else { return }
         let site = Self.siteName(url)
-        updatePrivacy { settings in
+        updatePrivacy(reloading: tab) { settings in
             if settings.shieldsDownSites.contains(site) {
                 settings.shieldsDownSites.remove(site)
             } else {
                 settings.shieldsDownSites.insert(site)
             }
         }
-        Task {
-            await refreshBlockingRules()
-            tab.webView.reload()
+    }
+
+    /// The script slider position for this tab's website.
+    func scriptLevel(for tab: BrowserTab) -> ScriptLevel {
+        privacy.scriptLevel(for: tab.url.map(Self.siteName))
+    }
+
+    /// Moves the script slider for one website, then reloads the tab.
+    /// Choosing the same position as the global slider removes the override.
+    func setScriptLevel(_ level: ScriptLevel, for tab: BrowserTab) {
+        guard let url = tab.url else { return }
+        let site = Self.siteName(url)
+        updatePrivacy(reloading: tab) { settings in
+            settings.siteScriptLevels[site] = level == settings.scriptLevel ? nil : level
         }
     }
 
@@ -434,13 +473,13 @@ final class BrowserStore {
         UserDefaults.standard.set(trackersBlockedTotal, forKey: "vela.trackersBlockedTotal")
     }
 
-    private func recordBlockedPopup(_ url: URL?, in tab: BrowserTab) {
-        guard privacy.blockPopups else { return }
+    private func recordBlockedPopup(_ url: URL?, isPopUnder: Bool, in tab: BrowserTab) {
+        guard isPopUnder ? privacy.popUnderProtection : privacy.blockPopups else { return }
         if let url { tab.popupsBlocked.append(url) }
         popupsBlockedTotal += 1
         UserDefaults.standard.set(popupsBlockedTotal, forKey: "vela.popupsBlockedTotal")
 
-        let popup = BlockedPopup(tabID: tab.id, url: url)
+        let popup = BlockedPopup(tabID: tab.id, url: url, isPopUnder: isPopUnder)
         blockedPopup = popup
         // Hide the notice after a few seconds.
         Task { [weak self] in
@@ -458,6 +497,64 @@ final class BrowserStore {
         let opener = tabs.first { $0.id == popup.tabID }
         newTab(url: url, opener: opener)
         blockedPopup = nil
+    }
+
+    // MARK: - Passwords
+
+    /// After you submit a login, offers to save it (unless it's already saved).
+    private func offerToSave(host: String, username: String, password: String, from tab: BrowserTab) {
+        guard !tab.isPrivate, privacy.offerToSavePasswords, !password.isEmpty else { return }
+        let site = PasswordVault.normalize(host)
+        guard !privacy.neverSavePasswordSites.contains(site) else { return }
+
+        let existing = passwordVault.entries(for: site).first { $0.account == username }
+        if let existing, passwordVault.password(for: existing) == password { return }
+        passwordPrompt = PasswordPrompt(
+            tabID: tab.id,
+            server: site,
+            account: username,
+            password: password,
+            isUpdate: existing != nil
+        )
+    }
+
+    func savePromptedPassword() {
+        guard let prompt = passwordPrompt else { return }
+        passwordVault.save(server: prompt.server, account: prompt.account, password: prompt.password)
+        passwordPrompt = nil
+        refreshSavedLogins()
+    }
+
+    func neverSavePasswords(for site: String) {
+        updatePrivacy { $0.neverSavePasswordSites.insert(site) }
+        passwordPrompt = nil
+    }
+
+    /// Asks for Touch ID, then types the saved login into the page.
+    func fill(_ entry: PasswordEntry, in tab: BrowserTab) async {
+        guard await passwordVault.unlock(reason: "fill your password for \(entry.server)"),
+              let password = passwordVault.password(for: entry) else { return }
+        tab.fillLogin(username: entry.account, password: password, for: entry.server)
+    }
+
+    func deletePassword(_ entry: PasswordEntry) {
+        passwordVault.delete(entry)
+        refreshSavedLogins()
+    }
+
+    func savePassword(server: String, account: String, password: String) {
+        passwordVault.save(server: server, account: account, password: password)
+        refreshSavedLogins()
+    }
+
+    /// Updates the key button in every tab after the saved logins change.
+    private func refreshSavedLogins() {
+        for tab in tabs where !tab.savedLogins.isEmpty || tab.url != nil {
+            guard let host = tab.url?.host() else { continue }
+            if !tab.savedLogins.isEmpty || !passwordVault.entries(for: host).isEmpty {
+                tab.savedLogins = passwordVault.entries(for: host)
+            }
+        }
     }
 
     // MARK: - Bookmarks

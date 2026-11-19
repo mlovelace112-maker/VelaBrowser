@@ -10,15 +10,17 @@ struct NewTabPage: View {
 
     var body: some View {
         VStack(spacing: 28) {
-            VStack(spacing: 8) {
-                Text(tab.isPrivate ? "Private Browsing" : greeting)
-                    .font(.system(size: 44, weight: .semibold, design: .rounded))
-                    .foregroundStyle(.white)
-                if tab.isPrivate {
-                    Text("Vela won't remember the pages you visit, your searches or your cookies after you quit Vela.")
-                        .font(.system(size: 13))
-                        .foregroundStyle(Nightglass.mutedText)
-                        .multilineTextAlignment(.center)
+            if tab.isPrivate || Appearance.shared.settings.showGreeting {
+                VStack(spacing: 8) {
+                    Text(tab.isPrivate ? "Private Browsing" : greeting)
+                        .font(.system(size: 44, weight: .semibold, design: .rounded))
+                        .foregroundStyle(.white)
+                    if tab.isPrivate {
+                        Text("Vela won't remember the pages you visit, your searches or your cookies after you quit Vela.")
+                            .font(.system(size: 13))
+                            .foregroundStyle(Nightglass.mutedText)
+                            .multilineTextAlignment(.center)
+                    }
                 }
             }
 
@@ -53,17 +55,20 @@ struct NewTabPage: View {
                 }
             }
 
-            LazyVGrid(
-                columns: Array(repeating: GridItem(.flexible(), spacing: 14), count: 6),
-                spacing: 14
-            ) {
-                ForEach(store.bookmarks.prefix(6)) { bookmark in
-                    SpeedDialTile(bookmark: bookmark) { tab.load(bookmark.url) }
+            if Appearance.shared.settings.showShortcuts {
+                LazyVGrid(
+                    columns: Array(repeating: GridItem(.flexible(), spacing: 14), count: 6),
+                    spacing: 14
+                ) {
+                    ForEach(store.bookmarks.prefix(6)) { bookmark in
+                        SpeedDialTile(bookmark: bookmark) { tab.load(bookmark.url) }
+                    }
                 }
+                .frame(maxWidth: 680)
             }
-            .frame(maxWidth: 680)
 
-            if store.trackersBlockedTotal + store.popupsBlockedTotal > 0 {
+            if Appearance.shared.settings.showBlockedStats,
+               store.trackersBlockedTotal + store.popupsBlockedTotal > 0 {
                 Label {
                     Text("\(store.trackersBlockedTotal) trackers and ads blocked · \(store.popupsBlockedTotal) pop-ups stopped")
                 } icon: {

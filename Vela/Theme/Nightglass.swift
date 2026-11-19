@@ -1,20 +1,33 @@
 import AppKit
 import SwiftUI
 
-/// Vela's "Nightglass" look: dark, sleek, frosted glass.
-/// Change a color here and it changes everywhere.
+/// Vela's colors and motion. The values come from the current theme in
+/// `Appearance`, so every view that uses `Nightglass.accent` updates when you
+/// pick a new theme in Settings.
+@MainActor
 enum Nightglass {
-    static let background = Color(hex: 0x07080C)
+    private static var theme: Theme { Appearance.shared.theme }
+
+    static var background: Color { Color(hex: theme.background) }
     static let stroke = Color.white.opacity(0.10)
     static let text = Color(hex: 0xEDEEF2)
     static let secondaryText = Color(hex: 0xC9CCD6)
     static let mutedText = Color(hex: 0x9BA0AE)
-    static let accent = Color(hex: 0x8B7CFF)
-    static let claude = Color(hex: 0xE8875F)
-    static let spotify = Color(hex: 0x4FD1A5)
+    static var accent: Color { Appearance.shared.accent }
+    static var claude: Color { Color(hex: theme.warm) }
+    static var spotify: Color { Color(hex: theme.cool) }
 
-    /// The springy animation used for tabs and groups.
-    static let spring = Animation.spring(response: 0.35, dampingFraction: 0.8)
+    // Safety colors used by the link checker, downloads and warnings.
+    static let safe = Color(hex: 0x4FD49B)
+    static let caution = Color(hex: 0xFFC65C)
+    static let danger = Color(hex: 0xFF5D6E)
+
+    /// The springy animation used for tabs and groups (nil when animations are off).
+    static var spring: Animation? {
+        Appearance.shared.settings.animationsEnabled
+            ? .spring(response: 0.35, dampingFraction: 0.8)
+            : nil
+    }
 }
 
 extension Color {
@@ -48,20 +61,25 @@ struct VisualEffectBackground: NSViewRepresentable {
     }
 }
 
-/// The dark backdrop with soft violet and teal glows behind the glass.
+/// The dark backdrop with the theme's two soft glows behind the glass.
 struct NightglassBackdrop: View {
     var body: some View {
+        let appearance = Appearance.shared
+        let theme = appearance.theme
+        let glow = appearance.settings.glowIntensity
+
         ZStack {
             Nightglass.background
             RadialGradient(
-                colors: [Color(hex: 0x2A1F5C), .clear],
+                colors: [Color(hex: theme.glowTop).opacity(glow), .clear],
                 center: UnitPoint(x: 0.15, y: 0.2), startRadius: 0, endRadius: 700
             )
             RadialGradient(
-                colors: [Color(hex: 0x0F3A4A), .clear],
+                colors: [Color(hex: theme.glowBottom).opacity(glow), .clear],
                 center: UnitPoint(x: 0.85, y: 0.8), startRadius: 0, endRadius: 650
             )
         }
+        .animation(.easeInOut(duration: 0.4), value: theme)
     }
 }
 

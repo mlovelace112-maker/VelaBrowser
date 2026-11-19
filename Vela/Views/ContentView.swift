@@ -12,7 +12,9 @@ struct ContentView: View {
             VStack(spacing: 0) {
                 TabStripView()
                 ToolbarView()
-                BookmarksBarView()
+                if Appearance.shared.settings.showBookmarksBar {
+                    BookmarksBarView()
+                }
                 if store.isFindBarVisible, let tab = store.selectedTab, tab.url != nil {
                     Rectangle().fill(Nightglass.stroke).frame(height: 1)
                     FindBar(tab: tab)
@@ -30,28 +32,10 @@ struct ContentView: View {
                         .transition(.move(edge: .leading).combined(with: .opacity))
                 }
 
-                ZStack {
-                    NightglassBackdrop()
-                    if let tab = store.selectedTab {
-                        if tab.url == nil {
-                            NewTabPage(tab: tab)
-                                .transition(.opacity)
-                        } else {
-                            // `.id` gives each tab its own view, so switching tabs swaps web views.
-                            WebViewContainer(webView: tab.webView)
-                                .id(tab.id)
-                        }
-                    }
-                }
-                .animation(.easeOut(duration: 0.2), value: store.selectedTab?.url == nil)
-                .overlay(alignment: .bottom) {
-                    if let popup = store.blockedPopup, popup.tabID == store.selectedTabID {
-                        PopupBlockedToast(popup: popup)
-                            .padding(.bottom, 24)
-                            .transition(.move(edge: .bottom).combined(with: .opacity))
-                    }
-                }
-                .animation(Nightglass.spring, value: store.blockedPopup)
+                PageArea()
+            }
+            .sheet(isPresented: $store.isPasswordsVisible) {
+                PasswordsView()
             }
         }
         .ignoresSafeArea()
@@ -61,5 +45,73 @@ struct ContentView: View {
         .sheet(isPresented: $store.isCookieManagerVisible) {
             CookieManagerView()
         }
+        .alert(
+            downloadQuestion,
+            isPresented: Binding(
+                get: { store.downloadManager.pendingWarning != nil },
+                set: { if !$0 { store.downloadManager.resolveWarning(false) } }
+            )
+        ) {
+            Button("Download Anyway", role: .destructive) { store.downloadManager.resolveWarning(true) }
+            Button("Cancel", role: .cancel) { store.downloadManager.resolveWarning(false) }
+        } message: {
+            Text(store.downloadManager.pendingWarning?.reason ?? "")
+        }
+    }
+
+    private var downloadQuestion: String {
+        guard let warning = store.downloadManager.pendingWarning else { return "Download this file?" }
+        return "Download “\(warning.filename)”?"
+    }
+}
+
+/// The page itself, with everything that floats over it: the link bubble,
+/// dangerous-link warnings, "Save password?" and "Pop-up blocked".
+private struct PageArea: View {
+    @Environment(BrowserStore.self) private var store
+
+    var body: some View {
+        ZStack {
+            NightglassBackdrop()
+            if let tab = store.selectedTab {
+                if tab.url == nil {
+                    NewTabPage(tab: tab)
+                        .transition(.opacity)
+                } else {
+                    // `.id` gives each tab its own view, so switching tabs swaps web views.
+                    WebViewContainer(webView: tab.webView)
+                        .id(tab.id)
+                    if let warning = tab.linkWarning {
+                        LinkWarningView(tab: tab, warning: warning)
+                            .transition(.opacity)
+                    }
+                }
+            }
+        }
+        .overlay(alignment: .bottomLeading) {
+            if let tab = store.selectedTab, let link = tab.hoveredLink, tab.linkWarning == nil {
+                LinkStatusBubble(url: link)
+                    .padding(10)
+                    .transition(.opacity)
+            }
+        }
+        .animation(.easeOut(duration: 0.12), value: store.selectedTab?.hoveredLink)
+        .overlay(alignment: .topTrailing) {
+            if let prompt = store.passwordPrompt, prompt.tabID == store.selectedTabID {
+                PasswordSaveBanner(prompt: prompt)
+                    .padding(14)
+                    .transition(.move(edge: .top).combined(with: .opacity))
+            }
+        }
+        .animation(Nightglass.spring, value: store.passwordPrompt)
+        .animation(.easeOut(duration: 0.2), value: store.selectedTab?.url == nil)
+        .overlay(alignment: .bottom) {
+            if let popup = store.blockedPopup, popup.tabID == store.selectedTabID {
+                PopupBlockedToast(popup: popup)
+                    .padding(.bottom, 24)
+                    .transition(.move(edge: .bottom).combined(with: .opacity))
+            }
+        }
+        .animation(Nightglass.spring, value: store.blockedPopup)
     }
 }

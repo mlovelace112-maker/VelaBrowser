@@ -31,6 +31,12 @@ final class BrowserTab: Identifiable {
     var trackersFound: [String] = []
     /// Pop-ups the shield stopped on the current page.
     var popupsBlocked: [URL] = []
+    /// The link under the mouse pointer, shown with its safety check at the bottom of the page.
+    var hoveredLink: URL?
+    /// Set when the link checker stopped a dangerous page from opening.
+    var linkWarning: LinkWarning?
+    /// Saved logins for this page's website (they make the key button appear).
+    var savedLogins: [PasswordEntry] = []
 
     /// Page zoom: 1.0 is 100%. Change it with zoomIn(), zoomOut() or resetZoom().
     private(set) var zoom: Double = 1
@@ -41,21 +47,34 @@ final class BrowserTab: Identifiable {
     @ObservationIgnored var onFinishLoading: (@MainActor () -> Void)?
     /// Called when the shield's page script spots a tracker.
     @ObservationIgnored var onTrackerFound: (@MainActor (String) -> Void)?
-    /// Called when a page tries to open a pop-up without you clicking anything.
-    @ObservationIgnored var onPopupBlocked: (@MainActor (URL?) -> Void)?
+    /// Called when the shield stops a pop-up. The flag is true for a pop-under.
+    @ObservationIgnored var onPopupBlocked: (@MainActor (URL?, Bool) -> Void)?
+    /// Called when a link or page turns into a file download.
+    @ObservationIgnored var onDownload: (@MainActor (WKDownload) -> Void)?
+    /// Called when the page shows a password box. Passes the website's host.
+    @ObservationIgnored var onLoginFormFound: (@MainActor (String) -> Void)?
+    /// Called when you submit a login: host, username, password.
+    @ObservationIgnored var onLoginSubmitted: (@MainActor (String, String, String) -> Void)?
+    /// Reads your current privacy settings (set by BrowserStore).
+    @ObservationIgnored var settings: @MainActor () -> PrivacySettings = { PrivacySettings() }
+
+    /// The frame (page or embedded frame) that holds the login form.
+    @ObservationIgnored fileprivate var loginFrame: WKFrameInfo?
+    /// Dangerous links you chose to open anyway.
+    @ObservationIgnored fileprivate var allowedDangerousURLs: Set<URL> = []
 
     private let coordinator: TabCoordinator
+    private let contentController: WKUserContentController
     @ObservationIgnored private var observations: [NSKeyValueObservation] = []
 
-    init(configuration: WKWebViewConfiguration, isPrivate: Bool = false, ruleList: WKContentRuleList?) {
+    init(configuration: WKWebViewConfiguration, isPrivate: Bool = false, ruleList: WKContentRuleList?, privacy: PrivacySettings) {
         // Each tab gets its own "user content controller": the place where
-        // blocking rules and our small shield scripts are attached.
+        // blocking rules and our small page scripts are attached.
         let tabConfiguration = configuration.copy() as! WKWebViewConfiguration
         let contentController = WKUserContentController()
-        contentController.addUserScript(ContentBlocker.popupGuardScript())
-        contentController.addUserScript(ContentBlocker.trackerScanScript())
         if let ruleList { contentController.add(ruleList) }
         tabConfiguration.userContentController = contentController
+        self.contentController = contentController
 
         webView = WKWebView(frame: .zero, configuration: tabConfiguration)
         webView.allowsBackForwardNavigationGestures = true
@@ -66,7 +85,11 @@ final class BrowserTab: Identifiable {
         coordinator.tab = self
         webView.navigationDelegate = coordinator
         webView.uiDelegate = coordinator
+        // Two mailboxes for messages from page scripts: one in the page's own
+        // script world, one in Vela's private world that pages can't reach.
         contentController.add(WeakScriptMessageHandler(coordinator), name: ContentBlocker.messageName)
+        contentController.add(WeakScriptMessageHandler(coordinator), contentWorld: .defaultClient, name: ContentBlocker.clientMessageName)
+        installScripts(for: privacy)
 
         // Key-Value Observing (KVO): WebKit tells us whenever these change.
         observations = [
@@ -86,9 +109,54 @@ final class BrowserTab: Identifiable {
 
     /// Swaps in a newly compiled set of blocking rules (or none).
     func apply(ruleList: WKContentRuleList?) {
-        let controller = webView.configuration.userContentController
-        controller.removeAllContentRuleLists()
-        if let ruleList { controller.add(ruleList) }
+        contentController.removeAllContentRuleLists()
+        if let ruleList { contentController.add(ruleList) }
+    }
+
+    /// (Re)adds Vela's page scripts. New scripts take effect on the next page load.
+    func installScripts(for privacy: PrivacySettings) {
+        contentController.removeAllUserScripts()
+        contentController.addUserScript(ContentBlocker.popupGuardScript(
+            popUnderProtection: privacy.blockingLevel != .off && privacy.popUnderProtection,
+            shieldsDownSites: privacy.shieldsDownSites
+        ))
+        contentController.addUserScript(ContentBlocker.trackerScanScript())
+        if let cleaner = ContentBlocker.adCleanerScript(for: privacy) {
+            contentController.addUserScript(cleaner)
+        }
+        contentController.addUserScript(LinkChecker.hoverScript())
+        contentController.addUserScript(PasswordScripts.loginScript())
+    }
+
+    /// "Open Anyway" on the dangerous-link warning.
+    func openDangerousLinkAnyway() {
+        guard let warning = linkWarning else { return }
+        allowedDangerousURLs.insert(warning.url)
+        linkWarning = nil
+        load(warning.url)
+    }
+
+    /// "Go Back" on the dangerous-link warning.
+    func dismissLinkWarning() {
+        linkWarning = nil
+        url = webView.url // A brand-new tab goes back to the New Tab page.
+    }
+
+    /// Types a saved login into the page's login form.
+    func fillLogin(username: String, password: String, for server: String) {
+        // Only ever fill into the website the login was saved for.
+        if let loginFrame {
+            guard PasswordVault.normalize(loginFrame.securityOrigin.host) == server else { return }
+        } else {
+            guard let url, PasswordVault.normalize(url.host() ?? "") == server else { return }
+        }
+        webView.callAsyncJavaScript(
+            PasswordScripts.fillFunction,
+            arguments: ["username": username, "password": password],
+            in: loginFrame,
+            in: .defaultClient,
+            completionHandler: nil
+        )
     }
 
     func setPopupsAllowed(_ allowed: Bool) {
@@ -99,6 +167,9 @@ final class BrowserTab: Identifiable {
     fileprivate func resetPageStats() {
         trackersFound = []
         popupsBlocked = []
+        hoveredLink = nil
+        savedLogins = []
+        loginFrame = nil
     }
 
     func zoomIn() { setZoom(zoom + 0.1) }
@@ -134,13 +205,13 @@ final class BrowserTab: Identifiable {
     }
 }
 
-/// Receives callbacks from WebKit for one tab.
-///
-/// This is where the pop-up blocker will live in step 3: every request to
-/// open a new window comes through `createWebViewWith`.
+/// Receives callbacks from WebKit for one tab: new windows, navigation
+/// decisions, downloads and messages from Vela's page scripts.
 @MainActor
 final class TabCoordinator: NSObject, WKNavigationDelegate, WKUIDelegate, WKScriptMessageHandler {
     weak var tab: BrowserTab?
+
+    // MARK: New windows and pop-ups
 
     func webView(
         _ webView: WKWebView,
@@ -148,11 +219,79 @@ final class TabCoordinator: NSObject, WKNavigationDelegate, WKUIDelegate, WKScri
         for navigationAction: WKNavigationAction,
         windowFeatures: WKWindowFeatures
     ) -> WKWebView? {
-        // Open target="_blank" links as a new tab instead of a new window.
-        if let url = navigationAction.request.url {
-            tab?.onOpenInNewTab?(url)
+        guard let tab, let url = navigationAction.request.url else { return nil }
+        let settings = tab.settings()
+
+        // Pop-under protection: never open a new tab straight to an ad network.
+        if settings.blockingLevel != .off, settings.popUnderProtection, shieldsUp(for: tab, settings),
+           let host = url.host(), ContentBlocker.isTracker(host) {
+            tab.onPopupBlocked?(url, true)
+            return nil
         }
+        // Open target="_blank" links as a new tab instead of a new window.
+        tab.onOpenInNewTab?(url)
         return nil
+    }
+
+    // MARK: Navigation decisions
+
+    /// Asked before every page (and frame) loads. This is where JavaScript gets
+    /// switched off for "Block all JavaScript", the link checker stops dangerous
+    /// pages, and "download this" links become downloads.
+    func webView(
+        _ webView: WKWebView,
+        decidePolicyFor navigationAction: WKNavigationAction,
+        preferences: WKWebpagePreferences
+    ) async -> (WKNavigationActionPolicy, WKWebpagePreferences) {
+        guard let tab else { return (.allow, preferences) }
+        let settings = tab.settings()
+
+        if navigationAction.shouldPerformDownload {
+            return (.download, preferences)
+        }
+
+        let isMainFrame = navigationAction.targetFrame?.isMainFrame ?? true
+        let pageURL = isMainFrame ? navigationAction.request.url : webView.url
+        let site = pageURL.map(BrowserStore.siteName)
+        preferences.allowsContentJavaScript = settings.scriptLevel(for: site) != .blockAll
+
+        if isMainFrame, let url = navigationAction.request.url {
+            let isRevisit = navigationAction.navigationType == .backForward || navigationAction.navigationType == .reload
+            if settings.linkCheckerEnabled, settings.warnBeforeDangerousLinks, !isRevisit,
+               !tab.allowedDangerousURLs.contains(url) {
+                let report = LinkChecker.check(url)
+                if report.verdict == .dangerous {
+                    tab.linkWarning = LinkWarning(url: url, report: report)
+                    return (.cancel, preferences)
+                }
+            }
+            tab.linkWarning = nil
+        }
+        return (.allow, preferences)
+    }
+
+    /// Asked when the server answers. Files a page can't display become downloads.
+    func webView(
+        _ webView: WKWebView,
+        decidePolicyFor navigationResponse: WKNavigationResponse
+    ) async -> WKNavigationResponsePolicy {
+        let isAttachment = (navigationResponse.response as? HTTPURLResponse)?
+            .value(forHTTPHeaderField: "Content-Disposition")?
+            .lowercased().hasPrefix("attachment") ?? false
+
+        if navigationResponse.isForMainFrame {
+            return (isAttachment || !navigationResponse.canShowMIMEType) ? .download : .allow
+        }
+        // Hidden frames can't start downloads (a common "drive-by download" trick).
+        return navigationResponse.canShowMIMEType && !isAttachment ? .allow : .cancel
+    }
+
+    func webView(_ webView: WKWebView, navigationAction: WKNavigationAction, didBecome download: WKDownload) {
+        tab?.onDownload?(download)
+    }
+
+    func webView(_ webView: WKWebView, navigationResponse: WKNavigationResponse, didBecome download: WKDownload) {
+        tab?.onDownload?(download)
     }
 
     func webView(_ webView: WKWebView, didCommit navigation: WKNavigation!) {
@@ -163,18 +302,55 @@ final class TabCoordinator: NSObject, WKNavigationDelegate, WKUIDelegate, WKScri
         tab?.onFinishLoading?()
     }
 
-    /// Messages from the shield scripts running inside the page.
+    // MARK: Messages from page scripts
+
     func userContentController(_ userContentController: WKUserContentController, didReceive message: WKScriptMessage) {
-        guard let body = message.body as? [String: Any], let type = body["type"] as? String else { return }
+        guard let tab, let body = message.body as? [String: Any], let type = body["type"] as? String else { return }
+
+        if message.name == ContentBlocker.clientMessageName {
+            handleClientMessage(type, body: body, frame: message.frameInfo, tab: tab)
+            return
+        }
         switch type {
         case "tracker":
-            if let domain = body["domain"] as? String { tab?.onTrackerFound?(domain) }
+            if let domain = body["domain"] as? String { tab.onTrackerFound?(domain) }
         case "popup":
             let address = body["url"] as? String ?? ""
-            tab?.onPopupBlocked?(URL(string: address))
+            let isPopUnder = body["popunder"] as? Bool ?? false
+            tab.onPopupBlocked?(URL(string: address), isPopUnder)
         default:
             break
         }
+    }
+
+    /// Messages from Vela's private script world (link hover and passwords).
+    private func handleClientMessage(_ type: String, body: [String: Any], frame: WKFrameInfo, tab: BrowserTab) {
+        // The website a message really came from, according to WebKit, not the page.
+        let origin = frame.securityOrigin
+        let isSecure = origin.protocol == "https" || origin.host == "localhost"
+
+        switch type {
+        case "hover":
+            guard frame.isMainFrame, tab.settings().linkCheckerEnabled else { return }
+            let address = body["url"] as? String ?? ""
+            tab.hoveredLink = address.isEmpty ? nil : URL(string: address)
+        case "loginForm":
+            guard isSecure else { return }
+            tab.loginFrame = frame
+            tab.onLoginFormFound?(origin.host)
+        case "credentials":
+            guard isSecure,
+                  let username = body["username"] as? String,
+                  let password = body["password"] as? String else { return }
+            tab.onLoginSubmitted?(origin.host, username, password)
+        default:
+            break
+        }
+    }
+
+    private func shieldsUp(for tab: BrowserTab, _ settings: PrivacySettings) -> Bool {
+        guard let url = tab.url else { return true }
+        return !settings.shieldsDownSites.contains(BrowserStore.siteName(url))
     }
 }
 

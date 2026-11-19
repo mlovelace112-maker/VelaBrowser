@@ -37,7 +37,7 @@ struct TabStripView: View {
         }
         .padding(.leading, 80) // room for the red/yellow/green window buttons
         .padding(.trailing, 10)
-        .frame(height: 44)
+        .frame(height: Appearance.shared.settings.compactTabs ? 38 : 44)
         .animation(Nightglass.spring, value: store.stripItems.map(\.id))
     }
 }
@@ -52,6 +52,7 @@ struct TabChip: View {
         let isSelected = store.selectedTabID == tab.id
         let group = store.group(for: tab)
         let shape = RoundedRectangle(cornerRadius: 9, style: .continuous)
+        let compact = Appearance.shared.settings.compactTabs
 
         HStack(spacing: 8) {
             ZStack(alignment: .bottomTrailing) {
@@ -83,8 +84,8 @@ struct TabChip: View {
         }
         .padding(.horizontal, tab.isPinned ? 0 : 10)
         .frame(width: tab.isPinned ? 36 : nil)
-        .frame(minWidth: tab.isPinned ? 36 : 90, maxWidth: tab.isPinned ? 36 : 200)
-        .frame(height: 30)
+        .frame(minWidth: tab.isPinned ? 36 : (compact ? 70 : 90), maxWidth: tab.isPinned ? 36 : (compact ? 160 : 200))
+        .frame(height: compact ? 26 : 30)
         .background(shape.fill(Color.white.opacity(isSelected ? 0.12 : (isHovering ? 0.06 : 0))))
         .overlay(shape.strokeBorder(
             tab.isPrivate ? Nightglass.accent.opacity(isSelected ? 0.6 : 0.3) : Color.white.opacity(isSelected ? 0.14 : 0)

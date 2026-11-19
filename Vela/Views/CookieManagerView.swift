@@ -144,8 +144,8 @@ private struct Tag: View {
     }
 }
 
-/// Vela ▸ Settings… (⌘,)
-struct SettingsView: View {
+/// The Privacy tab of Settings (⌘,).
+struct PrivacySettingsTab: View {
     @Environment(BrowserStore.self) private var store
     @State private var showCookies = false
 
@@ -158,6 +158,11 @@ struct SettingsView: View {
                     .tint(Nightglass.accent)
                 Button("Manage Cookies and Site Data…") { showCookies = true }
             }
+            Section("Ads") {
+                AdControls()
+            }
+            .toggleStyle(.switch)
+            .tint(Nightglass.accent)
             Section("Blocked so far") {
                 LabeledContent("Trackers and ads", value: "\(store.trackersBlockedTotal)")
                 LabeledContent("Pop-ups", value: "\(store.popupsBlockedTotal)")
@@ -178,8 +183,6 @@ struct SettingsView: View {
             }
         }
         .formStyle(.grouped)
-        .frame(width: 480)
-        .frame(minHeight: 420)
         .sheet(isPresented: $showCookies) { CookieManagerView() }
     }
 }

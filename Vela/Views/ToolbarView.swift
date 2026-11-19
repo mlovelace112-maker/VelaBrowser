@@ -42,6 +42,11 @@ struct ToolbarView: View {
 
                 ShieldButton(tab: tab)
 
+                if !store.downloadManager.items.isEmpty {
+                    DownloadsButton()
+                        .transition(.scale.combined(with: .opacity))
+                }
+
                 // Star: add or remove this page from your bookmarks.
                 Button { store.toggleBookmark(for: tab) } label: {
                     let saved = store.isBookmarked(tab.url)
@@ -54,17 +59,19 @@ struct ToolbarView: View {
                 .help("Bookmark This Page (⌘D)")
 
                 // Book: open your list of bookmarks.
-                Button { withAnimation(Nightglass.spring) { store.showSidebar(.bookmarks) } } label: {
-                    Image(systemName: "book")
-                        .foregroundStyle(
-                            store.isSidebarVisible && store.sidebarSection == .bookmarks
-                                ? Nightglass.accent : Nightglass.secondaryText
-                        )
+                if Appearance.shared.settings.showBookmarksButton {
+                    Button { withAnimation(Nightglass.spring) { store.showSidebar(.bookmarks) } } label: {
+                        Image(systemName: "book")
+                            .foregroundStyle(
+                                store.isSidebarVisible && store.sidebarSection == .bookmarks
+                                    ? Nightglass.accent : Nightglass.secondaryText
+                            )
+                    }
+                    .buttonStyle(IconButtonStyle())
+                    .help("Show Bookmarks (⌥⌘B)")
                 }
-                .buttonStyle(IconButtonStyle())
-                .help("Show Bookmarks (⌥⌘B)")
 
-                if let url = tab.url {
+                if Appearance.shared.settings.showShareButton, let url = tab.url {
                     ShareLink(item: url) {
                         Image(systemName: "square.and.arrow.up")
                     }
@@ -96,6 +103,8 @@ struct PageMenu: View {
             Button("New Private Tab") { store.newTab(isPrivate: true) }
             Button("Reopen Closed Tab") { store.reopenClosedTab() }
                 .disabled(!store.canReopenClosedTab)
+            Divider()
+            Button("Passwords…") { store.isPasswordsVisible = true }
             Divider()
             Button("Find on Page…") { store.showFindBar() }
                 .disabled(tab.url == nil)
@@ -176,6 +185,27 @@ struct AddressBar: View {
                     store.navigate(text, in: tab)
                     isFocused = false
                 }
+
+            // Key: fill a saved password into this page's login form.
+            if !tab.savedLogins.isEmpty {
+                Menu {
+                    ForEach(tab.savedLogins) { entry in
+                        Button(entry.account.isEmpty ? "Password for \(entry.server)" : entry.account) {
+                            Task { await store.fill(entry, in: tab) }
+                        }
+                    }
+                    Divider()
+                    Button("Open Passwords…") { store.isPasswordsVisible = true }
+                } label: {
+                    Image(systemName: "key.fill")
+                }
+                .menuStyle(.borderlessButton)
+                .menuIndicator(.hidden)
+                .fixedSize()
+                .tint(Nightglass.accent)
+                .help("Fill saved password")
+                .accessibilityLabel("Fill saved password")
+            }
 
             // Shows the zoom level when it isn't 100%. Click to reset.
             if tab.zoom != 1 {

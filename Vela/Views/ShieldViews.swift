@@ -111,6 +111,17 @@ struct ShieldPopover: View {
                 .font(.system(size: 12.5, weight: .medium))
             }
 
+            if tab.url != nil {
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("JavaScript on \(site)")
+                        .font(.system(size: 12.5, weight: .medium))
+                    ScriptSlider(level: Binding(
+                        get: { store.scriptLevel(for: tab) },
+                        set: { store.setScriptLevel($0, for: tab) }
+                    ))
+                }
+            }
+
             Divider()
 
             PrivacyControls()
@@ -214,7 +225,7 @@ struct PopupBlockedToast: View {
             Image(systemName: "rectangle.on.rectangle.slash")
                 .foregroundStyle(Nightglass.claude)
                 .accessibilityHidden(true)
-            Text(popup.url.map { "Pop-up blocked from \(BrowserStore.siteName($0))" } ?? "Pop-up blocked")
+            Text(message)
                 .font(.system(size: 13))
             if popup.url != nil {
                 Button("Allow once") { store.allowBlockedPopup() }
@@ -235,5 +246,74 @@ struct PopupBlockedToast: View {
         .padding(.vertical, 8)
         .glassPanel(cornerRadius: 14)
         .shadow(color: .black.opacity(0.45), radius: 16, y: 8)
+    }
+
+    private var message: String {
+        let kind = popup.isPopUnder ? "Pop-under ad" : "Pop-up"
+        guard let url = popup.url else { return "\(kind) blocked" }
+        return "\(kind) blocked from \(BrowserStore.siteName(url))"
+    }
+}
+
+/// The script-blocking slider: Allow all · Block 3rd-party · Block all.
+struct ScriptSlider: View {
+    @Binding var level: ScriptLevel
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Slider(
+                value: Binding(
+                    get: { Double(level.rawValue) },
+                    set: { level = ScriptLevel(rawValue: Int($0.rounded())) ?? .allowAll }
+                ),
+                in: 0...2,
+                step: 1
+            )
+            .tint(color)
+            .accessibilityValue(level.title)
+
+            HStack {
+                ForEach(ScriptLevel.allCases) { option in
+                    Text(option.shortTitle)
+                        .font(.system(size: 11, weight: option == level ? .semibold : .regular))
+                        .foregroundStyle(option == level ? color : Nightglass.mutedText)
+                    if option != ScriptLevel.allCases.last {
+                        Spacer()
+                    }
+                }
+            }
+            Text(level.detail)
+                .font(.system(size: 11.5))
+                .foregroundStyle(Nightglass.mutedText)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+    }
+
+    private var color: Color {
+        switch level {
+        case .allowAll: Nightglass.accent
+        case .blockThirdParty: Nightglass.caution
+        case .blockAll: Nightglass.danger
+        }
+    }
+}
+
+/// Extra ad switches, shown in Settings ▸ Privacy.
+struct AdControls: View {
+    @Environment(BrowserStore.self) private var store
+
+    var body: some View {
+        Toggle(isOn: store.privacyBinding(\.popUnderProtection)) {
+            Text("Pop-under protection")
+            Text("Stops ad tabs that open when you click anywhere on a page")
+        }
+        Toggle(isOn: store.privacyBinding(\.blockInterstitialAds)) {
+            Text("Block interstitial ads")
+            Text("Removes full-screen ads that cover a page before you can read it")
+        }
+        Toggle(isOn: store.privacyBinding(\.blockEmbeddedAds)) {
+            Text("Block embedded ads")
+            Text("Blocks video ads and ad boxes inside articles")
+        }
     }
 }

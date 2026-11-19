@@ -51,6 +51,35 @@ The first build takes a minute. If Xcode asks about signing, choose **Sign to Ru
 | Cookie manager | Open it from the shield panel or press ⌥⌘K. It shows every site's cookies, with trackers listed first. Delete one site, all trackers or everything. Mark a site **Keep** to stay signed in. |
 | Clear cookies on quit | Turn this on in the cookie manager or Settings. When Vela quits, it deletes every site's data except the sites marked Keep. |
 | Settings | Vela ▸ Settings… (⌘,) has every privacy switch, blocked totals, and the sites where the shield is off. |
+| **Pop-under protection** | Stops ad tabs that open when you click *anywhere* on a page. A click on a real link or button still works. Invisible full-page "click traps" are removed. |
+| **Interstitial ads** | Full-screen ads that cover a page are hidden or removed, and the page can scroll again. |
+| **Embedded ads** | Video-ad players and ad boxes inside articles are blocked and hidden. |
+| **Aggressive mode** | Now also blocks ad-shaped requests (like `/pagead/` or `prebid.js`) from any company, plus ~60 more pop-up and native-ad networks. |
+
+### Scripts, links and downloads
+| Feature | How to use it |
+|---|---|
+| **JavaScript slider** | Three positions: **Allow all**, **Block 3rd-party** (only the site's own scripts run) and **Block all**. Set the default in Settings ▸ Security, or one site from the shield panel. The page reloads with the new setting. |
+| **Link checker** | Point at a link and a bubble at the bottom-left shows where it really goes, with a green, yellow or red shield and the reason. |
+| **Dangerous link warning** | Links that look like phishing (a fake "@" address, a brand name on the wrong site with "login" or "verify" in it…) are stopped with a warning page. **Go Back** or **Open Anyway**. |
+| **Downloads** | A downloads button appears in the toolbar with a progress ring. Click it to see your files, cancel, or show them in Finder. |
+| **Malicious download blocking** | Windows programs (.exe, .scr, .bat…), disguised files ("invoice.pdf.exe"), names with hidden flip characters, and anything from an ad network are blocked. Apps, installers, scripts and macro documents ask first. Hidden frames can't start downloads. |
+| **macOS quarantine** | Every download is tagged "downloaded from the internet", so Gatekeeper and XProtect check apps before they open. |
+
+### Passwords
+| Feature | How to use it |
+|---|---|
+| **Password store** | Passwords are saved in the macOS Keychain, never in a normal file. Open them with ⌥⌘P or the ••• menu. Touch ID (or your Mac password) unlocks them for 10 minutes. |
+| **Save on sign-in** | After you sign in, Vela asks "Save password?" (or "Update?"). Choose **Never for This Site** to stop asking. Private tabs never save. |
+| **Autofill** | On a page with a login form, a 🔑 key appears in the address bar. Pick an account, confirm with Touch ID, and Vela fills it in. It only ever fills into the exact website the login was saved for. |
+| **Generator** | The Passwords window makes strong random passwords. Copied passwords are hidden from clipboard-history apps and cleared after 90 seconds. |
+| **Passkeys** | Not yet. macOS only lets browsers that Apple has approved use passkeys (an entitlement Apple grants to browser makers). |
+
+### Look and feel
+| Feature | How to use it |
+|---|---|
+| **Themes** | Settings ▸ Appearance: Nightglass, Aurora, Ember, Ocean, Rose and Graphite. Pick any accent color and how strong the background glow is. |
+| **Customize the window** | Show or hide the bookmarks bar, compact tabs, the bookmarks and share buttons, animations, and each part of the New Tab page. |
 
 The app also has a custom icon: a "V" drawn as the Vela constellation. Its source is `docs/icon-source.svg`.
 
@@ -58,7 +87,8 @@ The app also has a custom icon: a "V" drawn as the Vela constellation. Its sourc
 
 1. ✅ Mockups. See the design canvas.
 2. ✅ Core browser: tabs, tab groups, address bar, bookmarks, plus Safari-style extras: a sidebar, history, find, zoom, private tabs, pinned tabs and a custom icon. 
-3. ✅ Privacy: pop-up blocker, ad and tracker blocking, cookie manager. **← you are here**
+3. ✅ Privacy: pop-up blocker, ad and tracker blocking, cookie manager.
+3½. ✅ Security and looks: passwords, link checker, safe downloads, script slider, pop-under and stronger ad blocking, themes. **← you are here**
 4. ⏳ Extras: Claude in the address bar and side panel, image and video search, the Spotify player.
 
 ## How the code is organized
@@ -68,9 +98,13 @@ Vela/
   App/VelaApp.swift          The starting point. Creates the window, Settings and the menu shortcuts.
   App/AppDelegate.swift      Launch and quit handling (Dock icon, clearing cookies on quit).
   Privacy/                   The shield.
-    ContentBlocker.swift     Blocking rules, the tracker list, and the small page scripts.
+    ContentBlocker.swift     Blocking rules, ad lists, and the pop-up and ad-cleaner page scripts.
     CookieManager.swift      Lists and deletes cookies and site data.
-    PrivacySettings.swift    Your privacy choices, saved between launches.
+    PrivacySettings.swift    Your privacy and security choices, saved between launches.
+    LinkChecker.swift        Spots phishing tricks in web addresses; the link-hover script.
+    DownloadManager.swift    Downloads, the download guard, and macOS quarantine.
+  Passwords/
+    PasswordVault.swift      The Keychain password store, Touch ID, the generator, fill scripts.
   Assets.xcassets            The app icon and accent color.
   Models/                    The "brain": data and logic, no drawing.
     BrowserStore.swift       All tabs, groups, bookmarks and history, plus the actions on them.
@@ -84,12 +118,16 @@ Vela/
     ToolbarView.swift        Back, forward, reload, address bar, star, bookmarks, share and ••• menu.
     SidebarView.swift        Bookmarks and History, with search.
     FindBar.swift            Find on page (⌘F).
-    ShieldViews.swift        Shield button and panel, privacy switches, "Pop-up blocked" notice.
-    CookieManagerView.swift  The cookie manager and the Settings window.
+    ShieldViews.swift        Shield button and panel, privacy switches, script slider, "Pop-up blocked" notice.
+    SecurityViews.swift      Link bubble, dangerous-link warning, downloads, "Save password?", Security settings.
+    PasswordsView.swift      The Passwords window (⌥⌘P).
+    SettingsView.swift       The Settings window and its Appearance tab.
+    CookieManagerView.swift  The cookie manager and the Privacy settings tab.
     BookmarksBarView.swift   The bookmarks row.
     NewTabPage.swift         The greeting, the search box and the shortcut tiles.
     WebViewContainer.swift   Puts a WebKit page inside SwiftUI.
   Theme/Nightglass.swift     Colors, glass effects and the hover-button style.
+  Theme/Appearance.swift     The themes and your look-and-feel choices.
 ```
 
 ## Five ideas worth learning from this code
@@ -111,9 +149,21 @@ Vela doesn't inspect each web request itself. Instead, `ContentBlocker.makeRules
 
 WebKit compiles the list once (`WKContentRuleListStore`) and applies it to every page before anything downloads. That's the same fast engine Safari's ad blockers use. Changing a setting rebuilds the list and swaps it into every open tab.
 
+## The big ideas in step 3½
+
+**Two script worlds.** Vela's page scripts run in two places. The pop-up guard has to run *in the page's own world*, because it replaces the page's `window.open`. The link checker and password scripts run in Vela's **private world** (`WKContentWorld.defaultClient`): they see the same page, but the page's code can't see them, read them or send fake messages to them. Vela also asks WebKit (not the page) which website a message came from, so a page can't pretend to be your bank.
+
+**Async delegate methods.** WebKit asks "should this page load?" through `decidePolicyFor`. Vela uses the `async` versions, so code like "ask the user whether to keep this download, *then* answer WebKit" reads top to bottom instead of being split across callbacks. See `DownloadManager.destination(for:…)`.
+
+**What the link and download checks can't do.** They run entirely on your Mac and look at the *shape* of addresses and file names. They can't recognize a brand-new scam site with an ordinary name. That needs an online threat list such as Google Safe Browsing (free, needs an API key), which could be added later.
+
+**Keychain prompts after rebuilding.** Vela is signed "to run locally", so each rebuild looks like a slightly different app to the Keychain, and macOS may ask for your Mac password to let Vela read its saved passwords. Click **Always Allow**. Signing with your free Apple ID team in Xcode (Signing & Capabilities ▸ Team) makes this go away.
+
 ## Good first experiments
 
 - Change `Nightglass.accent` in `Theme/Nightglass.swift` to another color, such as `Color(hex: 0x4FD1A5)`, and run again.
 - Change the search engine in `BrowserStore.url(from:)`.
 - Add a domain to `ContentBlocker.trackerDomains` to block it everywhere.
+- Add your own theme to `Theme.all` in `Theme/Appearance.swift`.
+- Add a brand to `LinkChecker.brands` so look-alike sites get flagged.
 - Edit the starter bookmarks in `BrowserStore.loadBookmarks()`. Starter bookmarks only appear the first time, so delete your saved ones from the bookmarks bar to see the change.
