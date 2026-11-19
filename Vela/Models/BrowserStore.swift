@@ -49,6 +49,10 @@ final class BrowserStore {
 
     // Spotify
     let spotify = SpotifyPlayer()
+
+    /// Safari's bookmarks, read live (see SafariBookmarks.swift).
+    let safariBookmarks = SafariBookmarks()
+    let defaultBrowser = DefaultBrowser()
     /// "Save password?" waiting for an answer.
     var passwordPrompt: PasswordPrompt?
     /// The compiled blocking rules every tab uses.
@@ -375,6 +379,58 @@ final class BrowserStore {
                 .queryItems?.first(where: { $0.name == "q" })?.value,
               !query.isEmpty else { return nil }
         return query
+    }
+
+    /// A short notice such as "Reader isn't available for this page".
+    var pageNotice: String?
+
+    /// Turns Reader mode on or off for a tab (⇧⌘R).
+    func toggleReader(for tab: BrowserTab? = nil) async {
+        guard let tab = tab ?? selectedTab else { return }
+        if tab.reader != nil {
+            tab.reader = nil
+            return
+        }
+        guard tab.url != nil, tab.mediaSearch == nil, !tab.isLoading || tab.progress > 0.6 else { return }
+        do {
+            tab.reader = try await Reader.extract(from: tab)
+        } catch {
+            showNotice("Reader isn't available for this page.")
+        }
+    }
+
+    func showNotice(_ text: String) {
+        pageNotice = text
+        Task {
+            try? await Task.sleep(for: .seconds(2.5))
+            if pageNotice == text { pageNotice = nil }
+        }
+    }
+
+    /// Copies Safari's bookmarks into Vela's own list, skipping ones you already have.
+    @discardableResult
+    func importSafariBookmarks() -> Int {
+        safariBookmarks.reload(force: true)
+        var known = Set(bookmarks.map(\.url))
+        var added = 0
+        for bookmark in safariBookmarks.allBookmarks where !known.contains(bookmark.url) {
+            bookmarks.append(Bookmark(title: bookmark.title, url: bookmark.url))
+            known.insert(bookmark.url)
+            added += 1
+        }
+        if added > 0 { saveBookmarks() }
+        return added
+    }
+
+    /// A link or file opened from another app.
+    func openExternal(_ url: URL) {
+        let scheme = url.scheme?.lowercased() ?? ""
+        guard ["http", "https", "file"].contains(scheme) else { return }
+        if let tab = selectedTab, tab.url == nil, tab.mediaSearch == nil {
+            tab.load(url)
+        } else {
+            newTab(url: url)
+        }
     }
 
     /// Opens the Claude panel and asks it something.

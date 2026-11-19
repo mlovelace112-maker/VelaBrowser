@@ -39,6 +39,8 @@ final class BrowserTab: Identifiable {
     var savedLogins: [PasswordEntry] = []
     /// Set while the tab shows Vela's image or video search grid instead of a page.
     var mediaSearch: MediaSearch?
+    /// Set while Reader mode shows this page's article.
+    var reader: ReaderArticle?
 
     /// Page zoom: 1.0 is 100%. Change it with zoomIn(), zoomOut() or resetZoom().
     private(set) var zoom: Double = 1
@@ -143,8 +145,14 @@ final class BrowserTab: Identifiable {
 
     func load(_ url: URL) {
         mediaSearch = nil
+        reader = nil
         self.url = url
-        webView.load(URLRequest(url: url))
+        if url.isFileURL {
+            // A saved web page from your Mac (opened from Finder).
+            webView.loadFileURL(url, allowingReadAccessTo: url.deletingLastPathComponent())
+        } else {
+            webView.load(URLRequest(url: url))
+        }
     }
 
     /// Swaps in a newly compiled set of blocking rules (or none).

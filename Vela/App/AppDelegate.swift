@@ -6,7 +6,11 @@ import AppKit
 /// reach your settings and clear cookies before it closes.
 @MainActor
 final class AppDelegate: NSObject, NSApplicationDelegate {
-    let store = BrowserStore()
+    let store: BrowserStore = {
+        // Must run before the store loads your bookmarks and settings.
+        SandboxMigration.runIfNeeded()
+        return BrowserStore()
+    }()
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         // Set the Dock icon directly from the asset catalog. macOS caches app
@@ -14,6 +18,18 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         if let icon = NSImage(named: "VelaIcon") {
             NSApp.applicationIconImage = icon
         }
+    }
+
+    /// Links and web pages opened from other apps (when Vela is your default
+    /// browser), Finder, or Dock drops.
+    func application(_ application: NSApplication, open urls: [URL]) {
+        for url in urls { store.openExternal(url) }
+        NSApp.activate()
+    }
+
+    func applicationDidBecomeActive(_ notification: Notification) {
+        // Pick up bookmarks you changed in Safari while Vela was in the background.
+        store.safariBookmarks.reload()
     }
 
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool {

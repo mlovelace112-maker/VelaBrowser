@@ -273,6 +273,17 @@ struct AddressBar: View {
                 .accessibilityLabel("Fill saved password")
             }
 
+            // Reader: show just the article.
+            if tab.url != nil, tab.mediaSearch == nil, !isFocused {
+                Button { Task { await store.toggleReader(for: tab) } } label: {
+                    Image(systemName: tab.reader == nil ? "doc.plaintext" : "doc.plaintext.fill")
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundStyle(tab.reader == nil ? Nightglass.mutedText : Nightglass.accent)
+                }
+                .buttonStyle(.plain)
+                .help(tab.reader == nil ? "Show Reader (⇧⌘R)" : "Hide Reader (⇧⌘R)")
+            }
+
             // Shows the zoom level when it isn't 100%. Click to reset.
             if tab.zoom != 1 {
                 Button { tab.resetZoom() } label: {

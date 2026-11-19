@@ -4,6 +4,8 @@ import SwiftUI
 struct SettingsView: View {
     var body: some View {
         TabView {
+            GeneralSettingsTab()
+                .tabItem { Label("General", systemImage: "gearshape") }
             AppearanceSettingsTab()
                 .tabItem { Label("Appearance", systemImage: "paintpalette") }
             PrivacySettingsTab()
@@ -16,6 +18,90 @@ struct SettingsView: View {
                 .tabItem { Label("Spotify", systemImage: "music.note") }
         }
         .frame(width: 560, height: 560)
+    }
+}
+
+/// Default browser, Safari bookmarks and reader mode.
+struct GeneralSettingsTab: View {
+    @Environment(BrowserStore.self) private var store
+    @State private var importResult: String?
+
+    var body: some View {
+        let defaultBrowser = store.defaultBrowser
+        let safari = store.safariBookmarks
+        @Bindable var reader = ReaderSettings.shared
+
+        Form {
+            Section("Default browser") {
+                if defaultBrowser.isDefault {
+                    Label("Vela is your default browser", systemImage: "checkmark.seal.fill")
+                        .foregroundStyle(Nightglass.safe)
+                } else {
+                    HStack {
+                        Text("Open links from other apps in Vela")
+                        Spacer()
+                        Button("Make Vela the Default Browser") {
+                            Task { await defaultBrowser.makeDefault() }
+                        }
+                    }
+                }
+            }
+
+            Section {
+                switch safari.status {
+                case .loaded:
+                    LabeledContent("Status", value: "\(safari.allBookmarks.count) bookmarks in \(safari.folders.count) folders")
+                    HStack {
+                        Button("Copy All into Vela Bookmarks") {
+                            let added = store.importSafariBookmarks()
+                            importResult = added == 0 ? "Everything was already in Vela." : "Copied \(added) bookmarks."
+                        }
+                        if let importResult {
+                            Text(importResult).foregroundStyle(Nightglass.mutedText)
+                        }
+                    }
+                case .needsAccess:
+                    Text("Vela needs Full Disk Access to read Safari's bookmarks. Turn on Vela in System Settings ▸ Privacy & Security ▸ Full Disk Access (use + to add it).")
+                        .fixedSize(horizontal: false, vertical: true)
+                    HStack {
+                        Button("Open Full Disk Access Settings") { safari.openFullDiskAccessSettings() }
+                        Button("Check Again") { safari.reload(force: true) }
+                    }
+                case .notFound:
+                    Text("No Safari bookmarks were found on this Mac.")
+                }
+            } header: {
+                Text("Safari bookmarks")
+            } footer: {
+                Text("Vela reads Safari's bookmarks live (sidebar ▸ Safari) and never changes them. Bookmarks synced to Safari through iCloud show up too.")
+                    .font(.system(size: 11.5))
+                    .foregroundStyle(Nightglass.mutedText)
+            }
+
+            Section("Reader") {
+                Picker("Text size", selection: $reader.fontSize) {
+                    ForEach([15.0, 17, 19, 21, 24], id: \.self) { size in
+                        Text("\(Int(size)) pt").tag(size)
+                    }
+                }
+                Picker("Font", selection: $reader.font) {
+                    ForEach(ReaderFont.allCases) { font in
+                        Text(font.name).tag(font)
+                    }
+                }
+                Picker("Page", selection: $reader.page) {
+                    ForEach(ReaderPage.allCases) { page in
+                        Text(page.name).tag(page)
+                    }
+                }
+            }
+        }
+        .formStyle(.grouped)
+        .tint(Nightglass.accent)
+        .onAppear {
+            defaultBrowser.refresh()
+            safari.reload()
+        }
     }
 }
 

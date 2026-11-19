@@ -35,6 +35,7 @@ struct SidebarView: View {
                     switch store.sidebarSection {
                     case .bookmarks: bookmarksList
                     case .history: historyList
+                    case .safari: safariList
                     }
                 }
             }
@@ -53,6 +54,9 @@ struct SidebarView: View {
         .background(VisualEffectBackground(material: .sidebar))
         .overlay(alignment: .trailing) {
             Rectangle().fill(Nightglass.stroke).frame(width: 1)
+        }
+        .onChange(of: store.sidebarSection) {
+            if store.sidebarSection == .safari { store.safariBookmarks.reload() }
         }
         .confirmationDialog("Clear all browsing history?", isPresented: $confirmClear) {
             Button("Clear History", role: .destructive) { store.clearHistory() }
@@ -80,6 +84,72 @@ struct SidebarView: View {
                 Button("Delete Bookmark", role: .destructive) { store.removeBookmark(bookmark) }
             }
         }
+    }
+
+    // MARK: Safari
+
+    @ViewBuilder
+    private var safariList: some View {
+        let safari = store.safariBookmarks
+        switch safari.status {
+        case .needsAccess:
+            VStack(alignment: .leading, spacing: 10) {
+                Text("Vela needs Full Disk Access to read Safari's bookmarks. macOS protects Safari's folder, and Vela only ever reads it.")
+                    .font(.system(size: 12))
+                    .foregroundStyle(Nightglass.secondaryText)
+                    .fixedSize(horizontal: false, vertical: true)
+                Text("In System Settings, turn on Vela under Full Disk Access (use + to add it if it isn't listed), then come back here.")
+                    .font(.system(size: 11.5))
+                    .foregroundStyle(Nightglass.mutedText)
+                    .fixedSize(horizontal: false, vertical: true)
+                Button("Open Full Disk Access Settings") { safari.openFullDiskAccessSettings() }
+                    .controlSize(.small)
+                Button("Check Again") { safari.reload(force: true) }
+                    .controlSize(.small)
+            }
+            .padding(8)
+        case .notFound:
+            EmptyHint(text: "No Safari bookmarks were found on this Mac.")
+        case .loaded:
+            Button {
+                importedCount = store.importSafariBookmarks()
+            } label: {
+                Label(importLabel, systemImage: importedCount == nil ? "square.and.arrow.down" : "checkmark")
+                    .font(.system(size: 12, weight: .medium))
+                    .foregroundStyle(Nightglass.accent)
+            }
+            .buttonStyle(.plain)
+            .padding(.horizontal, 8)
+            .padding(.bottom, 4)
+
+            ForEach(safari.folders) { folder in
+                let items = folder.bookmarks.filter { matches($0.title, $0.url) }
+                if !items.isEmpty {
+                    Text(folder.path)
+                        .font(.system(size: 11, weight: .semibold))
+                        .foregroundStyle(Nightglass.mutedText)
+                        .textCase(.uppercase)
+                        .padding(.top, 10)
+                        .padding(.bottom, 2)
+                        .padding(.horizontal, 8)
+                    ForEach(items) { bookmark in
+                        SidebarRow(title: bookmark.title, url: bookmark.url, detail: BrowserStore.siteName(bookmark.url)) {
+                            store.open(bookmark.url)
+                        }
+                        .contextMenu {
+                            Button("Open in New Tab") { store.open(bookmark.url, inNewTab: true) }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    @State private var importedCount: Int?
+
+    private var importLabel: String {
+        guard let importedCount else { return "Copy All into Vela Bookmarks" }
+        return importedCount == 0 ? "Already in Vela" : "Copied \(importedCount) bookmarks"
     }
 
     // MARK: History

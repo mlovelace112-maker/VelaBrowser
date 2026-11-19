@@ -10,6 +10,24 @@ A personal web browser for Mac with a dark, glass-like look called **Nightglass*
 
 The first build takes a minute. If Xcode asks about signing, choose **Sign to Run Locally**.
 
+## Install it for everyday use
+
+Running from Xcode is for development. To use Vela every day, build a finished copy:
+
+1. Open **Terminal**, go to this folder (type `cd `, a space, then drag the VelaBrowser folder in and press Return).
+2. Run:
+   ```
+   TEAM=YOURTEAMID ./scripts/package.sh --install
+   ```
+   Your team ID is in Xcode ▸ Settings ▸ Accounts (select your Apple ID; it's the 10-character code next to "Personal Team"). Leave out `TEAM=…` to sign "to run locally" instead.
+3. Vela is copied to **Applications** and opens. A disk image (`build/Vela-1.0.dmg`) is made too, if you want a copy to keep.
+4. Make it your browser: Vela ▸ **Make Vela the Default Browser**, then confirm in the macOS dialog.
+5. For Safari bookmarks: System Settings ▸ Privacy & Security ▸ **Full Disk Access** ▸ turn on Vela (use **+** to add it from Applications).
+
+**Why the team ID matters.** macOS remembers permissions (Full Disk Access, Keychain) by the app's signature. Signed with your Apple ID team, each new build keeps the same signature, so you grant them once. Signed "locally", every rebuild looks like a new app and macOS asks again.
+
+To update later: pull the new code and run the same command.
+
 ## What works today
 
 ### Tabs
@@ -94,6 +112,14 @@ The first build takes a minute. If Xcode asks about signing, choose **Sign to Ru
 | **Video grid** | 16:9 thumbnails with duration, channel, views and date. Click to open the video. |
 | **Privacy** | Results come from DuckDuckGo (powered by Bing), fetched without cookies. SafeSearch is moderate. Back (⌘[) leaves the grid. |
 
+### Reader, Safari bookmarks and default browser
+| Feature | How to use it |
+|---|---|
+| **Reader** | ⇧⌘R or the 📄 button in the address bar. Shows just the article (using Mozilla's Readability, the same code as Firefox's Reader View) on a Night, Sepia or Paper page. Change the text size and font with the floating controls or in Settings ▸ General. Links open in the tab; Esc leaves Reader. |
+| **Safari bookmarks, live** | Sidebar ▸ **Safari** shows Safari's Favorites, Bookmarks Menu, folders and Reading List, re-read every time you switch to Vela. **Copy All into Vela Bookmarks** brings them into Vela's own list. Vela only reads Safari's file, never changes it. Needs Full Disk Access. |
+| **Default browser** | Vela ▸ Make Vela the Default Browser, or Settings ▸ General. Links from Mail, Messages and other apps then open in a new Vela tab, and `.html` files open from Finder. |
+| **Packaged app** | `scripts/package.sh` builds `Vela.app` and a `.dmg`. See "Install it for everyday use" above. |
+
 ### Spotify
 | Feature | How to use it |
 |---|---|
@@ -117,7 +143,8 @@ The app also has a custom icon: a "V" drawn as the Vela constellation. Its sourc
 2. ✅ Core browser: tabs, tab groups, address bar, bookmarks, plus Safari-style extras: a sidebar, history, find, zoom, private tabs, pinned tabs and a custom icon. 
 3. ✅ Privacy: pop-up blocker, ad and tracker blocking, cookie manager.
 3½. ✅ Security and looks: passwords, link checker, safe downloads, script slider, pop-under and stronger ad blocking, themes.
-4. ✅ Extras: Claude in the address bar and side panel, the Spotify player, image and video search, and animation polish. **← you are here**
+4. ✅ Extras: Claude in the address bar and side panel, the Spotify player, image and video search, and animation polish.
+5. ✅ Finishing touches: Reader, live Safari bookmarks, default browser, and a packaged app. **← you are here**
 
 ## How the code is organized
 
@@ -133,6 +160,12 @@ Vela/
     DownloadManager.swift    Downloads, the download guard, and macOS quarantine.
   Passwords/
     PasswordVault.swift      The Keychain password store, Touch ID, the generator, fill scripts.
+  App/SandboxMigration.swift One-time move of your data out of the old sandbox container.
+  App/DefaultBrowser.swift   Checks and sets Vela as the default browser.
+  Models/SafariBookmarks.swift Reads Safari's Bookmarks.plist live.
+  Reader/
+    Reader.swift             Finds the article and builds the styled reader page.
+    ReadabilityScript.swift  Mozilla Readability (Apache 2.0), embedded as text.
   Search/
     MediaSearch.swift        Image and video search through DuckDuckGo.
   Spotify/
@@ -159,6 +192,7 @@ Vela/
     SecurityViews.swift      Link bubble, dangerous-link warning, downloads, "Save password?", Security settings.
     PasswordsView.swift      The Passwords window (⌥⌘P).
     ClaudeViews.swift        The Claude panel, the quick-answer card and Settings ▸ Claude.
+    ReaderView.swift         The reader page and its floating controls.
     MediaSearchView.swift    The image and video grids, the preview, and the Images · Videos pill.
     SpotifyViews.swift       The Spotify bar, library and devices popovers, and Settings ▸ Spotify.
     SettingsView.swift       The Settings window and its Appearance tab.
@@ -207,12 +241,21 @@ WebKit compiles the list once (`WKContentRuleListStore`) and applies it to every
 
 **Never trust the input.** Claude's tool requests are checked before anything happens: wrong types, unknown tabs and cut-off input are sent back to Claude as errors. Web pages are treated the same way: their text is labeled untrusted, private tabs are off limits, and anything destructive waits for your click.
 
+## The big ideas in step 5
+
+**Leaving the sandbox.** Sandboxed Mac apps can only touch their own files, which keeps them safe but makes Safari's bookmarks unreachable. Vela now runs without the sandbox (see `Vela.entitlements`), still protected by the *hardened runtime*, and macOS still guards Safari's folder until you grant Full Disk Access. Because sandboxed apps store their data in a private container, `SandboxMigration` copies your settings, bookmarks, history and website data out of it once.
+
+**Being a browser.** `Vela-Info.plist` tells macOS that Vela opens `http`/`https` links and HTML files. That's what puts Vela in the default-browser list. Links from other apps arrive in `AppDelegate.application(_:open:)`.
+
+**Reader mode is a scoring game.** Readability looks at every block on the page and gives points for paragraphs, commas and article-like class names, and takes points away for "sidebar", "comment" and "ad". The winning block is the article. Vela runs it in its private script world and shows the result with scripts turned off.
+
 ## Good first experiments
 
 - Change `Nightglass.accent` in `Theme/Nightglass.swift` to another color, such as `Color(hex: 0x4FD1A5)`, and run again.
 - Change the search engine in `BrowserStore.url(from:)`.
 - Add a domain to `ContentBlocker.trackerDomains` to block it everywhere.
 - Add your own theme to `Theme.all` in `Theme/Appearance.swift`.
+- Add a fourth reader page color to `ReaderPage` in `Reader/Reader.swift`.
 - Give Claude a new tool: add it to `BrowserTools.definitions` and handle it in `BrowserTools.run`. A "scroll down" or "find on page" tool is a good start.
 - Change the suggestions in the empty Claude panel (`EmptyChat` in `Views/ClaudeViews.swift`).
 - Add a brand to `LinkChecker.brands` so look-alike sites get flagged.

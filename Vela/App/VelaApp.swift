@@ -55,6 +55,14 @@ struct BrowserCommands: Commands {
                 .keyboardShortcut("l")
         }
 
+        // Vela menu
+        CommandGroup(after: .appSettings) {
+            Button("Make Vela the Default Browser") {
+                Task { await store.defaultBrowser.makeDefault() }
+            }
+            .disabled(store.defaultBrowser.isDefault)
+        }
+
         // Shield
         CommandGroup(after: .newItem) {
             Divider()
@@ -93,6 +101,10 @@ struct BrowserCommands: Commands {
                 .keyboardShortcut("0")
             Button("Reload Page") { store.selectedTab?.webView.reload() }
                 .keyboardShortcut("r")
+            Button(store.selectedTab?.reader == nil ? "Show Reader" : "Hide Reader") {
+                Task { await store.toggleReader() }
+            }
+            .keyboardShortcut("r", modifiers: [.command, .shift])
             Divider()
         }
 

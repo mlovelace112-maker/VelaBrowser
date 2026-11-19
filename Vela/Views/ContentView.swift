@@ -92,6 +92,10 @@ private struct PageArea: View {
                     MediaSearchView(tab: tab, search: search)
                         .id(tab.id)
                         .transition(.opacity)
+                } else if let article = tab.reader {
+                    ReaderView(tab: tab, article: article)
+                        .id(tab.id)
+                        .transition(.move(edge: .bottom).combined(with: .opacity))
                 } else if tab.url == nil {
                     NewTabPage(tab: tab)
                         .transition(.opacity)
@@ -124,6 +128,20 @@ private struct PageArea: View {
         .animation(Nightglass.spring, value: store.passwordPrompt)
         .animation(.easeOut(duration: 0.2), value: store.selectedTab?.url == nil)
         .animation(.easeOut(duration: 0.2), value: store.selectedTab?.mediaSearch == nil)
+        .animation(Nightglass.spring, value: store.selectedTab?.reader)
+        .overlay(alignment: .bottom) {
+            if let notice = store.pageNotice {
+                Label(notice, systemImage: "info.circle")
+                    .font(.system(size: 12.5, weight: .medium))
+                    .foregroundStyle(Nightglass.text)
+                    .padding(.horizontal, 14)
+                    .padding(.vertical, 9)
+                    .glassPanel(cornerRadius: 12)
+                    .padding(.bottom, 70)
+                    .transition(.move(edge: .bottom).combined(with: .opacity))
+            }
+        }
+        .animation(Nightglass.spring, value: store.pageNotice)
         .overlay(alignment: .bottom) {
             if let popup = store.blockedPopup, popup.tabID == store.selectedTabID {
                 PopupBlockedToast(popup: popup)

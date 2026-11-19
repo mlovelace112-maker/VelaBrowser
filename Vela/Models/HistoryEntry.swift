@@ -18,7 +18,14 @@ struct ClosedTab {
 enum SidebarSection: String, CaseIterable, Identifiable {
     case bookmarks = "Bookmarks"
     case history = "History"
+    case safari = "Safari"
 
     var id: String { rawValue }
-    var symbol: String { self == .bookmarks ? "book" : "clock" }
+    var symbol: String {
+        switch self {
+        case .bookmarks: "book"
+        case .history: "clock"
+        case .safari: "safari"
+        }
+    }
 }
