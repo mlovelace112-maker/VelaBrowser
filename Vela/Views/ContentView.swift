@@ -6,6 +6,8 @@ struct ContentView: View {
     @Environment(BrowserStore.self) private var store
 
     var body: some View {
+        @Bindable var store = store
+
         VStack(spacing: 0) {
             VStack(spacing: 0) {
                 TabStripView()
@@ -42,11 +44,22 @@ struct ContentView: View {
                     }
                 }
                 .animation(.easeOut(duration: 0.2), value: store.selectedTab?.url == nil)
+                .overlay(alignment: .bottom) {
+                    if let popup = store.blockedPopup, popup.tabID == store.selectedTabID {
+                        PopupBlockedToast(popup: popup)
+                            .padding(.bottom, 24)
+                            .transition(.move(edge: .bottom).combined(with: .opacity))
+                    }
+                }
+                .animation(Nightglass.spring, value: store.blockedPopup)
             }
         }
         .ignoresSafeArea()
         .background(Nightglass.background)
         .animation(Nightglass.spring, value: store.isSidebarVisible)
         .animation(Nightglass.spring, value: store.isFindBarVisible)
+        .sheet(isPresented: $store.isCookieManagerVisible) {
+            CookieManagerView()
+        }
     }
 }

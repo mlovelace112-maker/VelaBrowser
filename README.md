@@ -40,20 +40,37 @@ The first build takes a minute. If Xcode asks about signing, choose **Sign to Ru
 | History | ⌘Y opens the sidebar on History, grouped by day and searchable. Right-click an entry to remove it, or use "Clear History…". |
 | Sidebar | ⇧⌘L, or the sidebar button at the far left of the toolbar |
 
+### Privacy and security (the shield)
+| Feature | How to use it |
+|---|---|
+| Ad and tracker blocking | This is on by default. The shield button to the right of the address bar shows how many trackers were blocked on the page. Choose **Standard** (block trackers that other sites load, like Brave), **Aggressive** (also block them on their own sites and hide leftover ad boxes) or **Off**. |
+| Turn the shield off for one site | Click the shield and flip its switch, for when a site doesn't work right. You can turn it back on later in Settings (⌘,). |
+| Pop-up blocker | Pop-ups you didn't click for are blocked. A "Pop-up blocked · Allow once" notice appears at the bottom of the window. |
+| Third-party cookies | Blocked by default, so ad companies can't follow you from site to site. |
+| HTTPS upgrade | Insecure `http://` requests are switched to secure `https://`. |
+| Cookie manager | Open it from the shield panel or press ⌥⌘K. It shows every site's cookies, with trackers listed first. Delete one site, all trackers or everything. Mark a site **Keep** to stay signed in. |
+| Clear cookies on quit | Turn this on in the cookie manager or Settings. When Vela quits, it deletes every site's data except the sites marked Keep. |
+| Settings | Vela ▸ Settings… (⌘,) has every privacy switch, blocked totals, and the sites where the shield is off. |
+
 The app also has a custom icon: a "V" drawn as the Vela constellation. Its source is `docs/icon-source.svg`.
 
 ## Roadmap
 
 1. ✅ Mockups. See the design canvas.
-2. ✅ Core browser: tabs, tab groups, address bar, bookmarks, plus Safari-style extras: a sidebar, history, find, zoom, private tabs, pinned tabs and a custom icon. **← you are here**
-3. ⏳ Privacy: pop-up blocker, ad and tracker blocking, cookie manager.
+2. ✅ Core browser: tabs, tab groups, address bar, bookmarks, plus Safari-style extras: a sidebar, history, find, zoom, private tabs, pinned tabs and a custom icon. 
+3. ✅ Privacy: pop-up blocker, ad and tracker blocking, cookie manager. **← you are here**
 4. ⏳ Extras: Claude in the address bar and side panel, image and video search, the Spotify player.
 
 ## How the code is organized
 
 ```
 Vela/
-  App/VelaApp.swift          The starting point. Creates the window and the menu shortcuts.
+  App/VelaApp.swift          The starting point. Creates the window, Settings and the menu shortcuts.
+  App/AppDelegate.swift      Launch and quit handling (Dock icon, clearing cookies on quit).
+  Privacy/                   The shield.
+    ContentBlocker.swift     Blocking rules, the tracker list, and the small page scripts.
+    CookieManager.swift      Lists and deletes cookies and site data.
+    PrivacySettings.swift    Your privacy choices, saved between launches.
   Assets.xcassets            The app icon and accent color.
   Models/                    The "brain": data and logic, no drawing.
     BrowserStore.swift       All tabs, groups, bookmarks and history, plus the actions on them.
@@ -67,6 +84,8 @@ Vela/
     ToolbarView.swift        Back, forward, reload, address bar, star, bookmarks, share and ••• menu.
     SidebarView.swift        Bookmarks and History, with search.
     FindBar.swift            Find on page (⌘F).
+    ShieldViews.swift        Shield button and panel, privacy switches, "Pop-up blocked" notice.
+    CookieManagerView.swift  The cookie manager and the Settings window.
     BookmarksBarView.swift   The bookmarks row.
     NewTabPage.swift         The greeting, the search box and the shortcut tiles.
     WebViewContainer.swift   Puts a WebKit page inside SwiftUI.
@@ -81,8 +100,20 @@ Vela/
 4. **Bridging to AppKit.** WebKit's `WKWebView` and the macOS blur view are older AppKit views. `NSViewRepresentable` (see `WebViewContainer` and `VisualEffectBackground`) is how SwiftUI borrows them.
 5. **Watching WebKit with KVO.** `BrowserTab.watch(...)` asks WebKit to report whenever the page's title, address or loading progress changes, and copies the new values into the tab. That's what makes the loading bar and tab titles update live.
 
+## The big idea in step 3: content rule lists
+
+Vela doesn't inspect each web request itself. Instead, `ContentBlocker.makeRules` writes a list of rules in JSON, such as:
+
+```json
+{ "trigger": { "url-filter": "^[^:]+://+([^:/]+\\.)?doubleclick\\.net[:/]", "load-type": ["third-party"] },
+  "action":  { "type": "block" } }
+```
+
+WebKit compiles the list once (`WKContentRuleListStore`) and applies it to every page before anything downloads. That's the same fast engine Safari's ad blockers use. Changing a setting rebuilds the list and swaps it into every open tab.
+
 ## Good first experiments
 
 - Change `Nightglass.accent` in `Theme/Nightglass.swift` to another color, such as `Color(hex: 0x4FD1A5)`, and run again.
 - Change the search engine in `BrowserStore.url(from:)`.
+- Add a domain to `ContentBlocker.trackerDomains` to block it everywhere.
 - Edit the starter bookmarks in `BrowserStore.loadBookmarks()`. Starter bookmarks only appear the first time, so delete your saved ones from the bookmarks bar to see the change.

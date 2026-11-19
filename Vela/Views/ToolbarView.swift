@@ -40,6 +40,8 @@ struct ToolbarView: View {
                 AddressBar(tab: tab)
                     .padding(.horizontal, 6)
 
+                ShieldButton(tab: tab)
+
                 // Star: add or remove this page from your bookmarks.
                 Button { store.toggleBookmark(for: tab) } label: {
                     let saved = store.isBookmarked(tab.url)

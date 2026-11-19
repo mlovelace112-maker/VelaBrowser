@@ -28,6 +28,17 @@ final class BrowserStore {
     /// Bumped by ⌘F; the find bar watches it and grabs keyboard focus.
     var findBarFocusRequest = 0
 
+    // Privacy
+    private(set) var privacy = PrivacySettings.load()
+    private(set) var trackersBlockedTotal = UserDefaults.standard.integer(forKey: "vela.trackersBlockedTotal")
+    private(set) var popupsBlockedTotal = UserDefaults.standard.integer(forKey: "vela.popupsBlockedTotal")
+    /// The pop-up shown in the "Pop-up blocked" notice, if any.
+    var blockedPopup: BlockedPopup?
+    var isCookieManagerVisible = false
+    let cookieManager = CookieManager()
+    /// The compiled blocking rules every tab uses.
+    @ObservationIgnored private var ruleList: WKContentRuleList?
+
     /// Shared settings for every normal tab's web view.
     @ObservationIgnored let configuration: WKWebViewConfiguration
     /// Settings for private tabs: a "non-persistent" data store keeps cookies
@@ -40,19 +51,18 @@ final class BrowserStore {
         config.websiteDataStore = .default()
         // Identify as Safari so websites serve their normal desktop pages.
         config.applicationNameForUserAgent = "Version/18.0 Safari/605.1.15"
-        // Pages can't open windows on their own; links still work (see TabCoordinator).
-        config.preferences.javaScriptCanOpenWindowsAutomatically = false
         configuration = config
 
         let privateConfig = WKWebViewConfiguration()
         privateConfig.websiteDataStore = .nonPersistent()
         privateConfig.applicationNameForUserAgent = config.applicationNameForUserAgent
-        privateConfig.preferences.javaScriptCanOpenWindowsAutomatically = false
         privateConfiguration = privateConfig
 
         bookmarks = Self.loadBookmarks()
         history = Self.loadHistory()
+        applyPopupSetting()
         newTab()
+        Task { await refreshBlockingRules() }
     }
 
     var selectedTab: BrowserTab? {
@@ -68,13 +78,20 @@ final class BrowserStore {
         let makePrivate = isPrivate || (opener?.isPrivate ?? false)
         let tab = BrowserTab(
             configuration: makePrivate ? privateConfiguration : configuration,
-            isPrivate: makePrivate
+            isPrivate: makePrivate,
+            ruleList: ruleList
         )
         tab.onOpenInNewTab = { [weak self, weak tab] url in
             self?.newTab(url: url, opener: tab)
         }
         tab.onFinishLoading = { [weak self, weak tab] in
             if let tab { self?.recordVisit(tab) }
+        }
+        tab.onTrackerFound = { [weak self, weak tab] domain in
+            if let tab { self?.recordTracker(domain, in: tab) }
+        }
+        tab.onPopupBlocked = { [weak self, weak tab] url in
+            if let tab { self?.recordBlockedPopup(url, in: tab) }
         }
 
         // Open next to the tab that opened it, inside the same group.
@@ -344,6 +361,103 @@ final class BrowserStore {
     func showFindBar() {
         isFindBarVisible = true
         findBarFocusRequest += 1
+    }
+
+    // MARK: - Privacy shield
+
+    /// Changes privacy settings, saves them, and rebuilds the blocking rules if needed.
+    func updatePrivacy(_ change: (inout PrivacySettings) -> Void) {
+        let old = privacy
+        change(&privacy)
+        guard privacy != old else { return }
+        privacy.save()
+        if privacy.blockPopups != old.blockPopups { applyPopupSetting() }
+        if privacy.ruleInputs != old.ruleInputs {
+            Task { await refreshBlockingRules() }
+        }
+    }
+
+    func refreshBlockingRules() async {
+        ruleList = await ContentBlocker.compile(for: privacy)
+        for tab in tabs { tab.apply(ruleList: ruleList) }
+    }
+
+    private func applyPopupSetting() {
+        // With this off, WebKit blocks pop-ups that you didn't click for.
+        let allowed = !privacy.blockPopups
+        configuration.preferences.javaScriptCanOpenWindowsAutomatically = allowed
+        privateConfiguration.preferences.javaScriptCanOpenWindowsAutomatically = allowed
+        for tab in tabs { tab.setPopupsAllowed(allowed) }
+    }
+
+    func shieldsUp(for tab: BrowserTab) -> Bool {
+        guard let url = tab.url else { return true }
+        return !privacy.shieldsDownSites.contains(Self.siteName(url))
+    }
+
+    /// Turns the shield off (or back on) for the tab's website, then reloads it.
+    func toggleShields(for tab: BrowserTab) {
+        guard let url = tab.url else { return }
+        let site = Self.siteName(url)
+        updatePrivacy { settings in
+            if settings.shieldsDownSites.contains(site) {
+                settings.shieldsDownSites.remove(site)
+            } else {
+                settings.shieldsDownSites.insert(site)
+            }
+        }
+        Task {
+            await refreshBlockingRules()
+            tab.webView.reload()
+        }
+    }
+
+    func isKept(_ site: String) -> Bool {
+        privacy.keptSites.contains(site)
+    }
+
+    func toggleKept(_ site: String) {
+        updatePrivacy { settings in
+            if settings.keptSites.contains(site) {
+                settings.keptSites.remove(site)
+            } else {
+                settings.keptSites.insert(site)
+            }
+        }
+    }
+
+    private func recordTracker(_ domain: String, in tab: BrowserTab) {
+        guard privacy.blockingLevel != .off, shieldsUp(for: tab),
+              !tab.trackersFound.contains(domain) else { return }
+        tab.trackersFound.append(domain)
+        trackersBlockedTotal += 1
+        UserDefaults.standard.set(trackersBlockedTotal, forKey: "vela.trackersBlockedTotal")
+    }
+
+    private func recordBlockedPopup(_ url: URL?, in tab: BrowserTab) {
+        guard privacy.blockPopups else { return }
+        if let url { tab.popupsBlocked.append(url) }
+        popupsBlockedTotal += 1
+        UserDefaults.standard.set(popupsBlockedTotal, forKey: "vela.popupsBlockedTotal")
+
+        let popup = BlockedPopup(tabID: tab.id, url: url)
+        blockedPopup = popup
+        // Hide the notice after a few seconds.
+        Task { [weak self] in
+            try? await Task.sleep(for: .seconds(8))
+            if self?.blockedPopup?.id == popup.id { self?.blockedPopup = nil }
+        }
+    }
+
+    /// "Allow once": opens the blocked pop-up as a new tab.
+    func allowBlockedPopup() {
+        guard let popup = blockedPopup, let url = popup.url else {
+            blockedPopup = nil
+            return
+        }
+        let opener = tabs.first { $0.id == popup.tabID }
+        newTab(url: url, opener: opener)
+        blockedPopup = nil
     }
 
     // MARK: - Bookmarks

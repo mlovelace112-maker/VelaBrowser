@@ -62,6 +62,17 @@ struct NewTabPage: View {
                 }
             }
             .frame(maxWidth: 680)
+
+            if store.trackersBlockedTotal + store.popupsBlockedTotal > 0 {
+                Label {
+                    Text("\(store.trackersBlockedTotal) trackers and ads blocked · \(store.popupsBlockedTotal) pop-ups stopped")
+                } icon: {
+                    Image(systemName: "shield.lefthalf.filled").foregroundStyle(Nightglass.accent)
+                }
+                .font(.system(size: 12.5))
+                .foregroundStyle(Nightglass.mutedText)
+                .contentTransition(.numericText())
+            }
         }
         .padding(40)
         .frame(maxWidth: .infinity, maxHeight: .infinity)

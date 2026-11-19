@@ -7,7 +7,10 @@ import SwiftUI
 /// every view through the environment.
 @main
 struct VelaApp: App {
-    @State private var store = BrowserStore()
+    /// Connects our AppDelegate (launch and quit handling) to the SwiftUI app.
+    @NSApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
+
+    private var store: BrowserStore { appDelegate.store }
 
     var body: some Scene {
         Window("Vela", id: "main") {
@@ -19,6 +22,13 @@ struct VelaApp: App {
         .windowStyle(.hiddenTitleBar)
         .commands {
             BrowserCommands(store: store)
+        }
+
+        // Vela ▸ Settings… (⌘,)
+        Settings {
+            SettingsView()
+                .environment(store)
+                .preferredColorScheme(.dark)
         }
     }
 }
@@ -43,6 +53,13 @@ struct BrowserCommands: Commands {
             Divider()
             Button("Open Location…") { store.addressBarFocusRequest += 1 }
                 .keyboardShortcut("l")
+        }
+
+        // Shield
+        CommandGroup(after: .newItem) {
+            Divider()
+            Button("Manage Cookies and Site Data…") { store.isCookieManagerVisible = true }
+                .keyboardShortcut("k", modifiers: [.command, .option])
         }
 
         // Edit menu: Find
