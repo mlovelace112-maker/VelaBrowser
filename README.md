@@ -84,6 +84,7 @@ If a step fails, make the same change by hand in the repo's **Settings**: Code s
 | Feature | How to use it |
 |---|---|
 | Address bar | Type an address or a search (searches go to DuckDuckGo). ⌘L jumps to the address bar. |
+| Suggestions as you type | The address bar lists matching open tabs (**Switch to Tab**), bookmarks (Vela's and Safari's), history and DuckDuckGo search ideas. When a site's name starts with what you typed ("git" → github.com), it becomes the **Top Hit** and Return opens it. ↑/↓ pick a row, Esc closes the list. DuckDuckGo ideas are never fetched in private tabs, and you can turn them off in the shield panel (**DuckDuckGo suggestions as I type**). |
 | Back, forward and reload | ⌘[, ⌘] and ⌘R, or swipe with two fingers on a trackpad |
 | Find on page | ⌘F. Return goes to the next match, ⇧Return to the previous one, and Esc closes the bar. |
 | Zoom | ⌘= zooms in, ⌘- zooms out and ⌘0 resets. The zoom level shows in the address bar, and you can click it to reset. |
