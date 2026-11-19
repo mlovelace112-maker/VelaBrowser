@@ -4,6 +4,16 @@
     <title>Vela</title>
     <description>Updates for the Vela browser</description>
     <item>
+      <title>Vela 1.0-beta.17</title>
+      <pubDate>Thu, 19 Nov 2026 21:52:53 GMT</pubDate>
+      <sparkle:version>17</sparkle:version>
+      <sparkle:shortVersionString>1.0-beta.17</sparkle:shortVersionString>
+      <sparkle:minimumSystemVersion>15.0</sparkle:minimumSystemVersion>
+      <sparkle:channel>beta</sparkle:channel>
+      <description>&lt;p&gt;A beta build with the newest changes.&lt;/p&gt;&lt;ul&gt;&lt;li&gt;Split the address bar view so it compiles quickly&lt;/li&gt;&lt;li&gt;Close address suggestions on outside clicks and Esc&lt;/li&gt;&lt;/ul&gt;</description>
+      <enclosure url="https://github.com/mlovelace112-maker/VelaBrowser/releases/download/v1.0-beta.17/Vela-1.0-beta.17.zip" sparkle:edSignature="g7yrqcJ2Hu+S8S2RdYbrLUSNFSmOkvhEEYA2SjvJpJo4L9Ma8NTmK1Y6jCZTt2i8Mzk44WiPMtijOtI/mvRWAg==" length="7113188" type="application/octet-stream" />
+    </item>
+    <item>
       <title>Vela 1.0-beta.16</title>
       <pubDate>Thu, 19 Nov 2026 21:31:13 GMT</pubDate>
       <sparkle:version>16</sparkle:version>
