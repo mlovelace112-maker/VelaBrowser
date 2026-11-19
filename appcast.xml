@@ -4,6 +4,16 @@
     <title>Vela</title>
     <description>Updates for the Vela browser</description>
     <item>
+      <title>Vela 1.0-beta.12</title>
+      <pubDate>Thu, 19 Nov 2026 20:13:52 GMT</pubDate>
+      <sparkle:version>12</sparkle:version>
+      <sparkle:shortVersionString>1.0-beta.12</sparkle:shortVersionString>
+      <sparkle:minimumSystemVersion>15.0</sparkle:minimumSystemVersion>
+      <sparkle:channel>beta</sparkle:channel>
+      <description>&lt;p&gt;A beta build with the newest changes.&lt;/p&gt;&lt;ul&gt;&lt;li&gt;Add 2FA codes and a site info / certificate panel&lt;/li&gt;&lt;/ul&gt;</description>
+      <enclosure url="https://github.com/mlovelace112-maker/VelaBrowser/releases/download/v1.0-beta.12/Vela-1.0-beta.12.zip" sparkle:edSignature="z7sGMTNzKB2dFZGwkWfgZ9F6WxZSOupnLvOlc1hD9CvnzsK5/ytAR8upiKEBliD2Jf8iOJfeDku61HrCwlq2Aw==" length="6716255" type="application/octet-stream" />
+    </item>
+    <item>
       <title>Vela 1.0-beta.11</title>
       <pubDate>Thu, 19 Nov 2026 20:09:38 GMT</pubDate>
       <sparkle:version>11</sparkle:version>
