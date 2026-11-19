@@ -241,7 +241,8 @@ struct AddressBar: View {
     /// Watches clicks and Esc while the list is open (see watchForDismiss).
     @State private var dismissMonitor: Any?
 
-    var body: some View {
+    /// The address bar itself: lock, text field and the small buttons.
+    @ViewBuilder private var fieldBox: some View {
         let shape = RoundedRectangle(cornerRadius: 11, style: .continuous)
 
         HStack(spacing: 8) {
@@ -387,6 +388,11 @@ struct AddressBar: View {
         .shadow(color: Nightglass.accent.opacity(isFocused ? 0.3 : 0), radius: 10)
         .animation(.easeOut(duration: 0.2), value: isFocused)
         .animation(.easeOut(duration: 0.15), value: isFocused && canAsk)
+    }
+
+    /// The address bar with the suggestion list dropping down under it.
+    private var fieldWithSuggestions: some View {
+        fieldBox
         .overlay(alignment: .topLeading) {
             if showsSuggestions && !suggestions.items.isEmpty {
                 SuggestionList(engine: suggestions, onPick: open)
@@ -396,6 +402,12 @@ struct AddressBar: View {
             }
         }
         .animation(.easeOut(duration: 0.12), value: showsSuggestions && !suggestions.items.isEmpty)
+    }
+
+    // Built in three parts (fieldBox, fieldWithSuggestions, body) so the
+    // Swift compiler can check it in reasonable time.
+    var body: some View {
+        fieldWithSuggestions
         .onChange(of: text) {
             if isFocused {
                 typed = text
@@ -408,7 +420,6 @@ struct AddressBar: View {
         .onChange(of: showsSuggestions) {
             if showsSuggestions { watchForDismiss() } else { stopWatchingForDismiss() }
         }
-        .onChange(of: tab.id) { hideSuggestions() }
         .onDisappear { stopWatchingForDismiss() }
         .onChange(of: isFocused) {
             if isFocused {
@@ -426,7 +437,10 @@ struct AddressBar: View {
         }
         .onAppear { text = displayText }
         .onChange(of: tab.url) { if !isFocused { text = displayText } }
-        .onChange(of: tab.id) { text = displayText }
+        .onChange(of: tab.id) {
+            hideSuggestions()
+            text = displayText
+        }
         .onChange(of: isFocused) { if !isFocused { text = displayText } }
         .onChange(of: store.addressBarFocusRequest) { isFocused = true }
     }
