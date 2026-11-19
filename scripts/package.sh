@@ -66,7 +66,7 @@ DMG="$BUILD/Vela-$VERSION.dmg"
 ZIP="$BUILD/Vela-$VERSION.zip"
 ditto -c -k --keepParent "$APP" "$ZIP"
 
-echo "▸ Making $DMG…"
+echo "▸ Making ${DMG}…"
 STAGING="$BUILD/dmg"
 mkdir -p "$STAGING"
 ditto "$APP" "$STAGING/Vela.app"
