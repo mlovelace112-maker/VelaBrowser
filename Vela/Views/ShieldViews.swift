@@ -139,6 +139,22 @@ struct ShieldPopover: View {
                         .foregroundStyle(Nightglass.mutedText)
                         .fixedSize(horizontal: false, vertical: true)
                 }
+                VStack(alignment: .leading, spacing: 6) {
+                    Toggle(isOn: Binding(
+                        get: { store.isLockedDown(tab) },
+                        set: { _ in store.toggleLockdown(for: tab) }
+                    )) {
+                        Label("Lockdown Mode on \(site)", systemImage: "lock.shield")
+                            .font(.system(size: 12.5, weight: .medium))
+                    }
+                    .toggleStyle(.switch)
+                    .controlSize(.small)
+                    .tint(Nightglass.accent)
+                    Text("Apple's strictest protection, for sites you don't trust or ones that matter a lot, like your bank. Some fancy features (3D, fast scripts, some fonts) turn off.")
+                        .font(.system(size: 11.5))
+                        .foregroundStyle(Nightglass.mutedText)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
                 if store.privacy.blockPopups {
                     Toggle(isOn: Binding(
                         get: { store.allowsPopups(for: tab) },
@@ -215,6 +231,15 @@ struct PrivacyControls: View {
             }
             SettingRow("DuckDuckGo suggestions as I type") {
                 Toggle("DuckDuckGo suggestions as I type", isOn: store.privacyBinding(\.searchSuggestions))
+            }
+            SettingRow("Remove tracking from links") {
+                Toggle("Remove tracking from links", isOn: store.privacyBinding(\.stripTrackingParameters))
+            }
+            SettingRow("Ask sites not to sell my data (GPC)") {
+                Toggle("Ask sites not to sell my data (GPC)", isOn: store.privacyBinding(\.globalPrivacyControl))
+            }
+            SettingRow("Reject cookie pop-ups for me") {
+                Toggle("Reject cookie pop-ups for me", isOn: store.privacyBinding(\.dismissCookieBanners))
             }
         }
         .toggleStyle(.switch)

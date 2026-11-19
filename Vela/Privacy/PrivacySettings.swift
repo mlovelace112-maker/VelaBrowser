@@ -84,6 +84,16 @@ struct PrivacySettings: Codable, Equatable {
     /// Show DuckDuckGo's search ideas under the address bar as you type.
     /// (Sends what you type to DuckDuckGo; never in private tabs.)
     var searchSuggestions = true
+    /// Removes tracking tags (utm_source, fbclid, gclid…) from links before they load.
+    var stripTrackingParameters = true
+    /// Global Privacy Control: tells sites "don't sell or share my data".
+    var globalPrivacyControl = true
+    /// Answers cookie pop-ups with "Reject all", or hides them.
+    var dismissCookieBanners = true
+    /// Sites that run in Lockdown Mode: Apple's extra-strict setting that turns
+    /// off the web features attackers use most (fast JavaScript, WebGL, some
+    /// fonts and file types). For sites you don't trust, or ones that matter a lot.
+    var lockdownSites: Set<String> = []
 
     // Site permissions
     /// Sites allowed to open pop-ups even with "Block pop-ups" on.
@@ -153,7 +163,9 @@ struct PrivacySettings: Codable, Equatable {
             blockInterstitialAds: blockInterstitialAds,
             blockEmbeddedAds: blockEmbeddedAds,
             shieldsDownSites: shieldsDownSites,
-            fingerprintProtection: fingerprintProtection
+            fingerprintProtection: fingerprintProtection,
+            globalPrivacyControl: globalPrivacyControl,
+            dismissCookieBanners: dismissCookieBanners
         )
     }
 
@@ -164,6 +176,8 @@ struct PrivacySettings: Codable, Equatable {
         let blockEmbeddedAds: Bool
         let shieldsDownSites: Set<String>
         let fingerprintProtection: Bool
+        let globalPrivacyControl: Bool
+        let dismissCookieBanners: Bool
     }
 
     struct RuleInputs: Equatable {
@@ -203,6 +217,10 @@ struct PrivacySettings: Codable, Equatable {
         signInSites = try c.decodeIfPresent(Set<String>.self, forKey: .signInSites) ?? d.signInSites
         fingerprintProtection = try c.decodeIfPresent(Bool.self, forKey: .fingerprintProtection) ?? d.fingerprintProtection
         searchSuggestions = try c.decodeIfPresent(Bool.self, forKey: .searchSuggestions) ?? d.searchSuggestions
+        stripTrackingParameters = try c.decodeIfPresent(Bool.self, forKey: .stripTrackingParameters) ?? d.stripTrackingParameters
+        globalPrivacyControl = try c.decodeIfPresent(Bool.self, forKey: .globalPrivacyControl) ?? d.globalPrivacyControl
+        dismissCookieBanners = try c.decodeIfPresent(Bool.self, forKey: .dismissCookieBanners) ?? d.dismissCookieBanners
+        lockdownSites = try c.decodeIfPresent(Set<String>.self, forKey: .lockdownSites) ?? d.lockdownSites
         popupAllowedSites = try c.decodeIfPresent(Set<String>.self, forKey: .popupAllowedSites) ?? d.popupAllowedSites
         cameraSites = try c.decodeIfPresent([String: Bool].self, forKey: .cameraSites) ?? d.cameraSites
         microphoneSites = try c.decodeIfPresent([String: Bool].self, forKey: .microphoneSites) ?? d.microphoneSites
