@@ -141,6 +141,7 @@ private struct PageArea: View {
                     // `.id` gives each tab its own view, so switching tabs swaps web views.
                     WebViewContainer(webView: tab.webView)
                         .id(tab.id)
+                        .background { TranslationHost(tab: tab).id(tab.id) }
                     if let warning = tab.linkWarning {
                         LinkWarningView(tab: tab, warning: warning)
                             .transition(.opacity)

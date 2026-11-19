@@ -36,6 +36,7 @@ struct SidebarView: View {
                     case .bookmarks: bookmarksList
                     case .history: historyList
                     case .safari: safariList
+                    case .readingList: ReadingListSection(search: search)
                     }
                 }
             }

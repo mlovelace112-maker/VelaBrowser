@@ -42,6 +42,8 @@ final class BrowserStore {
     @ObservationIgnored private var isStarting = true
     var bookmarks: [Bookmark] = []
     var history: [HistoryEntry] = []
+    /// Pages saved to read later. See PageTools.swift.
+    var readingList: [ReadingItem] = BrowserStore.loadReadingList()
 
     // Window panels
     var isSidebarVisible = false
@@ -226,6 +228,7 @@ final class BrowserStore {
         tab.onFinishLoading = { [weak self, weak tab] in
             guard let self, let tab else { return }
             self.recordVisit(tab)
+            Task { await tab.detectLanguage() }
             if tab.pendingCode != nil { Task { await self.fillPendingCode(in: tab) } }
         }
         tab.onTrackerFound = { [weak self, weak tab] domain in

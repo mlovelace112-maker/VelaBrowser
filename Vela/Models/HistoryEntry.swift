@@ -20,6 +20,7 @@ enum SidebarSection: String, CaseIterable, Identifiable {
     case bookmarks = "Bookmarks"
     case history = "History"
     case safari = "Safari"
+    case readingList = "Read Later"
 
     var id: String { rawValue }
     var symbol: String {
@@ -27,6 +28,7 @@ enum SidebarSection: String, CaseIterable, Identifiable {
         case .bookmarks: "book"
         case .history: "clock"
         case .safari: "safari"
+        case .readingList: "eyeglasses"
         }
     }
 }

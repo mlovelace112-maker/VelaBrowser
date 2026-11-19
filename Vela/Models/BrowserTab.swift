@@ -52,6 +52,11 @@ final class BrowserTab: Identifiable {
     var mediaSearch: MediaSearch?
     /// Set while Reader mode shows this page's article.
     var reader: ReaderArticle?
+    /// The page's language code ("fr") when it isn't yours and can be translated.
+    var pageLanguage: String?
+    var translation: TranslationStatus = .none
+    /// Bumped by the Translate button; the page's TranslationHost watches it.
+    var translateRequests = 0
 
     /// A website asking to use your camera or microphone, waiting for your answer.
     var permissionRequest: PermissionRequest?
