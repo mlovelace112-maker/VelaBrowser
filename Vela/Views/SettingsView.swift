@@ -12,6 +12,8 @@ struct SettingsView: View {
                 .tabItem { Label("Privacy", systemImage: "hand.raised") }
             SecuritySettingsTab()
                 .tabItem { Label("Security", systemImage: "lock.shield") }
+            SiteSettingsList()
+                .tabItem { Label("Sites", systemImage: "globe") }
             ClaudeSettingsTab()
                 .tabItem { Label("Claude", systemImage: "sparkle") }
             SpotifySettingsTab()
@@ -77,6 +79,8 @@ struct GeneralSettingsTab: View {
                     .font(.system(size: 11.5))
                     .foregroundStyle(Nightglass.mutedText)
             }
+
+            TabsSettingsSection()
 
             UpdatesSection()
 

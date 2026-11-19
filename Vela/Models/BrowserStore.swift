@@ -14,7 +14,21 @@ import WebKit
 final class BrowserStore {
     var tabs: [BrowserTab] = []
     var groups: [TabGroup] = []
-    var selectedTabID: UUID?
+    var selectedTabID: UUID? {
+        didSet {
+            guard selectedTabID != oldValue else { return }
+            // Remember when you left the old tab (for tab sleeping), and
+            // wake the new one if it was asleep.
+            tabs.first { $0.id == oldValue }?.lastActive = Date()
+            if let tab = selectedTab {
+                tab.lastActive = Date()
+                if !isStarting { tab.wake() }
+            }
+        }
+    }
+    /// True until the blocking rules are ready at launch, so restored tabs
+    /// don't load before the shield is up.
+    @ObservationIgnored private var isStarting = true
     var bookmarks: [Bookmark] = []
     var history: [HistoryEntry] = []
 
@@ -35,6 +49,7 @@ final class BrowserStore {
     /// The pop-up shown in the "Pop-up blocked" notice, if any.
     var blockedPopup: BlockedPopup?
     var isCookieManagerVisible = false
+    var isSiteSettingsVisible = false
     let cookieManager = CookieManager()
 
     // Security
@@ -42,6 +57,22 @@ final class BrowserStore {
     let passwordVault = PasswordVault()
     let safeBrowsing = SafeBrowsing()
     var isPasswordsVisible = false
+
+    /// Private @duck.com addresses (see EmailMasking.swift).
+    let emailMasking = EmailMasking()
+
+    // Tabs: session restore and sleeping
+    /// Reopen the tabs you had open when you last quit.
+    var restoresSession = UserDefaults.standard.object(forKey: "vela.restoreSession") as? Bool ?? true {
+        didSet {
+            UserDefaults.standard.set(restoresSession, forKey: "vela.restoreSession")
+            saveSession()
+        }
+    }
+    /// Tabs you haven't looked at for this many minutes go to sleep (0 = never).
+    var tabSleepMinutes = UserDefaults.standard.object(forKey: "vela.tabSleepMinutes") as? Int ?? 30 {
+        didSet { UserDefaults.standard.set(tabSleepMinutes, forKey: "vela.tabSleepMinutes") }
+    }
 
     // Claude
     let claude = ClaudeAssistant()
@@ -84,9 +115,14 @@ final class BrowserStore {
         applyPopupSetting()
         downloadManager.settings = { [weak self] in self?.privacy ?? PrivacySettings() }
         downloadManager.checkThreat = { [weak self] url in await self?.safeBrowsing.check(url) }
-        newTab()
+        if !restoreSession() { newTab() }
         claude.store = self
-        Task { await refreshBlockingRules() }
+        Task {
+            await refreshBlockingRules()
+            isStarting = false
+            selectedTab?.wake()
+        }
+        startTabSleepTimer()
     }
 
     /// Safer WebKit settings for every tab.
@@ -207,6 +243,10 @@ final class BrowserStore {
         }
         tab.onCloseRequested = { [weak self, weak tab] in
             if let tab { self?.close(tab) }
+        }
+        tab.onMediaPermission = { [weak self, weak tab] site, kinds, answer in
+            guard let self, let tab else { answer(false); return }
+            self.decideMediaPermission(site: site, kinds: kinds, in: tab, answer: answer)
         }
     }
 
@@ -590,8 +630,167 @@ final class BrowserStore {
         let allowed = !privacy.blockPopups
         configuration.preferences.javaScriptCanOpenWindowsAutomatically = allowed
         privateConfiguration.preferences.javaScriptCanOpenWindowsAutomatically = allowed
-        for tab in tabs { tab.setPopupsAllowed(allowed) }
+        for tab in tabs { tab.setPopupsAllowed(privacy.allowsPopups(on: tab.url.map(Self.siteName))) }
     }
+
+    /// Whether this tab's website may open pop-ups (Site Settings).
+    func allowsPopups(for tab: BrowserTab) -> Bool {
+        guard let url = tab.url else { return false }
+        return privacy.popupAllowedSites.contains(Self.siteName(url))
+    }
+
+    /// Lets one website open pop-ups even with "Block pop-ups" on, or stops it.
+    func setPopupsAllowed(_ allowed: Bool, for site: String) {
+        updatePrivacy { settings in
+            if allowed { settings.popupAllowedSites.insert(site) } else { settings.popupAllowedSites.remove(site) }
+        }
+        for tab in tabs where tab.url.map(Self.siteName) == site {
+            tab.setPopupsAllowed(privacy.allowsPopups(on: site))
+        }
+    }
+
+    // MARK: - Camera and microphone
+
+    /// Uses your remembered answer for the site, or asks with a banner.
+    private func decideMediaPermission(site: String, kinds: [PermissionKind], in tab: BrowserTab, answer: @escaping @MainActor (Bool) -> Void) {
+        let remembered = kinds.map { privacy.permission($0, for: site) }
+        if remembered.contains(false) { answer(false); return }
+        if !remembered.contains(nil) { answer(true); return }
+        tab.permissionRequest?.answer(false) // Only one question at a time.
+        tab.permissionRequest = PermissionRequest(site: site, kinds: kinds, answer: answer)
+    }
+
+    /// Your answer on the camera/microphone banner.
+    func answerPermission(in tab: BrowserTab, allow: Bool, remember: Bool) {
+        guard let request = tab.permissionRequest else { return }
+        tab.permissionRequest = nil
+        if remember && !tab.isPrivate {
+            updatePrivacy { settings in
+                for kind in request.kinds { settings.setPermission(kind, allow, for: request.site) }
+            }
+        }
+        request.answer(allow)
+    }
+
+    // MARK: - Picture in picture and private email
+
+    /// Floats the page's video in a small window that stays on top (⌥⌘V).
+    func togglePictureInPicture() async {
+        guard let tab = selectedTab, tab.url != nil, !tab.isAsleep else { return }
+        switch await tab.togglePictureInPicture() {
+        case "none": showNotice("There's no video on this page.")
+        case "unsupported": showNotice("This video can't play in picture in picture.")
+        default: break
+        }
+    }
+
+    /// Makes a new @duck.com address, types it into the email box, and copies it (⌥⌘E).
+    func fillPrivateEmail() async {
+        guard let tab = selectedTab, tab.url != nil else { return }
+        guard emailMasking.isConnected else {
+            showNotice("Set up email masking first: Settings ▸ Privacy ▸ Email masking.")
+            return
+        }
+        do {
+            let address = try await emailMasking.newAddress()
+            NSPasteboard.general.clearContents()
+            NSPasteboard.general.setString(address, forType: .string)
+            let filled = await tab.fillEmail(address)
+            showNotice(filled ? "Filled in \(address) (also copied)." : "Copied \(address). Paste it into the email box.")
+        } catch {
+            showNotice(error.localizedDescription)
+        }
+    }
+
+    // MARK: - Session restore and tab sleeping
+
+    private static let sessionKey = "vela.session"
+
+    private struct SavedSession: Codable {
+        var tabs: [SavedTab]
+        var groups: [TabGroup]
+        var selected: Int?
+    }
+
+    private struct SavedTab: Codable {
+        var url: URL
+        var title: String
+        var isPinned: Bool
+        var groupID: UUID?
+    }
+
+    /// Saves your open tabs (never private ones) so the next launch can reopen them.
+    /// Runs every minute and when you quit, so even a crash loses little.
+    func saveSession() {
+        guard restoresSession else {
+            UserDefaults.standard.removeObject(forKey: Self.sessionKey)
+            return
+        }
+        let kept = tabs.filter { tab in
+            !tab.isPrivate && tab.mediaSearch == nil
+                && ["http", "https"].contains(tab.url?.scheme?.lowercased() ?? "")
+        }
+        let saved = kept.compactMap { tab in
+            tab.url.map { SavedTab(url: $0, title: tab.title, isPinned: tab.isPinned, groupID: tab.groupID) }
+        }
+        let usedGroups = groups.filter { group in saved.contains { $0.groupID == group.id } }
+        let session = SavedSession(tabs: saved, groups: usedGroups, selected: kept.firstIndex { $0.id == selectedTabID })
+        if let data = try? JSONEncoder().encode(session) {
+            UserDefaults.standard.set(data, forKey: Self.sessionKey)
+        }
+    }
+
+    /// Reopens last session's tabs, asleep, so nothing loads until you look at it.
+    private func restoreSession() -> Bool {
+        guard restoresSession,
+              let data = UserDefaults.standard.data(forKey: Self.sessionKey),
+              let session = try? JSONDecoder().decode(SavedSession.self, from: data),
+              !session.tabs.isEmpty else { return false }
+        groups = session.groups
+        for saved in session.tabs {
+            let tab = BrowserTab(configuration: configuration, ruleList: ruleList, privacy: privacy)
+            connect(tab)
+            tab.isPinned = saved.isPinned
+            tab.groupID = saved.isPinned ? nil : saved.groupID
+            tab.restoreAsleep(url: saved.url, title: saved.title)
+            tabs.append(tab)
+        }
+        removeEmptyGroups()
+        let index = min(max(session.selected ?? 0, 0), tabs.count - 1)
+        selectedTabID = tabs[index].id
+        return true
+    }
+
+    private func startTabSleepTimer() {
+        Task { [weak self] in
+            while !Task.isCancelled {
+                try? await Task.sleep(for: .seconds(60))
+                guard let self else { return }
+                await self.sleepIdleTabs()
+                self.saveSession()
+            }
+        }
+    }
+
+    /// Puts tabs you haven't looked at in a while to sleep. Never the tab
+    /// you're on, pinned tabs, or tabs playing sound or using the camera.
+    func sleepIdleTabs(force: Bool = false) async {
+        guard force || tabSleepMinutes > 0 else { return }
+        let cutoff = Date().addingTimeInterval(-Double(tabSleepMinutes) * 60)
+        for tab in tabs where tab.id != selectedTabID && !tab.isAsleep && !tab.isPinned && tab.url != nil {
+            guard force || tab.lastActive < cutoff else { continue }
+            if tab.isLoading || tab.isUsingCamera || tab.isUsingMicrophone || tab.permissionRequest != nil { continue }
+            if await tab.webView.requestMediaPlaybackState() == .playing { continue }
+            tab.sleep()
+        }
+    }
+
+    /// Tabs ▸ Put Other Tabs to Sleep.
+    func sleepOtherTabs() {
+        Task { await sleepIdleTabs(force: true) }
+    }
+
+    var sleepingTabCount: Int { tabs.filter(\.isAsleep).count }
 
     func shieldsUp(for tab: BrowserTab) -> Bool {
         guard let url = tab.url else { return true }
@@ -840,7 +1039,7 @@ final class BrowserStore {
 
     /// Saves a visit, unless the tab is private or it's the same page as the last visit.
     func recordVisit(_ tab: BrowserTab) {
-        guard !tab.isPrivate, let url = tab.url, url.scheme?.hasPrefix("http") == true else { return }
+        guard !tab.isPrivate, !tab.isAsleep, let url = tab.url, url.scheme?.hasPrefix("http") == true else { return }
         if let last = history.first, last.url == url {
             history[0].title = tab.title
             history[0].date = Date()

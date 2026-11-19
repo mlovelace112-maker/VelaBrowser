@@ -1,8 +1,8 @@
 import SwiftUI
 
 /// A named, colored set of tabs that can be collapsed into a single chip.
-struct TabGroup: Identifiable, Equatable {
-    let id = UUID()
+struct TabGroup: Identifiable, Equatable, Codable {
+    var id = UUID()
     var name: String
     var color: GroupColor
     var isCollapsed = false

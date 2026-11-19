@@ -8,6 +8,12 @@
 	<false/>
 	<key>com.apple.security.network.client</key>
 	<true/>
+	<!-- Let websites use the camera and microphone (only after you say yes
+	     in Vela, and macOS asks once too). The hardened runtime blocks them without these. -->
+	<key>com.apple.security.device.camera</key>
+	<true/>
+	<key>com.apple.security.device.audio-input</key>
+	<true/>
 	<!-- Builds signed "to run locally" have no team ID, so macOS would refuse
 	     to load the Sparkle updater framework into Vela without this. -->
 	<key>com.apple.security.cs.disable-library-validation</key>

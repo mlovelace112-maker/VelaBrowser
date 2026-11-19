@@ -78,6 +78,17 @@ struct PrivacySettings: Codable, Equatable {
     /// Sites where you chose "Allow Sign-In": they keep every cookie, including
     /// the ones a sign-in service sets inside them, so logging in works.
     var signInSites: Set<String> = []
+    /// Fingerprinting protection: blurs the small details (canvas drawing,
+    /// audio, hardware) that sites combine to recognize your Mac without cookies.
+    var fingerprintProtection = true
+
+    // Site permissions
+    /// Sites allowed to open pop-ups even with "Block pop-ups" on.
+    var popupAllowedSites: Set<String> = []
+    /// Your remembered camera answers: true = allowed, false = blocked.
+    var cameraSites: [String: Bool] = [:]
+    /// Your remembered microphone answers: true = allowed, false = blocked.
+    var microphoneSites: [String: Bool] = [:]
 
     // Scripts
     var scriptLevel: ScriptLevel = .allowAll
@@ -90,6 +101,8 @@ struct PrivacySettings: Codable, Equatable {
     var blockDangerousDownloads = true
     /// Check pages and downloads against Google Safe Browsing (needs an API key).
     var safeBrowsingEnabled = true
+    /// Look up each finished download on VirusTotal (needs an API key).
+    var scanDownloads = true
 
     // Passwords
     var offerToSavePasswords = true
@@ -99,6 +112,11 @@ struct PrivacySettings: Codable, Equatable {
     var neverSavePasswordSites: Set<String> = []
 
     init() {}
+
+    /// Whether this site may open pop-ups.
+    func allowsPopups(on site: String?) -> Bool {
+        !blockPopups || (site.map { popupAllowedSites.contains($0) } ?? false)
+    }
 
     func scriptLevel(for site: String?) -> ScriptLevel {
         guard let site else { return scriptLevel }
@@ -131,7 +149,8 @@ struct PrivacySettings: Codable, Equatable {
             popUnderProtection: popUnderProtection,
             blockInterstitialAds: blockInterstitialAds,
             blockEmbeddedAds: blockEmbeddedAds,
-            shieldsDownSites: shieldsDownSites
+            shieldsDownSites: shieldsDownSites,
+            fingerprintProtection: fingerprintProtection
         )
     }
 
@@ -141,6 +160,7 @@ struct PrivacySettings: Codable, Equatable {
         let blockInterstitialAds: Bool
         let blockEmbeddedAds: Bool
         let shieldsDownSites: Set<String>
+        let fingerprintProtection: Bool
     }
 
     struct RuleInputs: Equatable {
@@ -178,6 +198,11 @@ struct PrivacySettings: Codable, Equatable {
         keptSites = try c.decodeIfPresent(Set<String>.self, forKey: .keptSites) ?? d.keptSites
         shieldsDownSites = try c.decodeIfPresent(Set<String>.self, forKey: .shieldsDownSites) ?? d.shieldsDownSites
         signInSites = try c.decodeIfPresent(Set<String>.self, forKey: .signInSites) ?? d.signInSites
+        fingerprintProtection = try c.decodeIfPresent(Bool.self, forKey: .fingerprintProtection) ?? d.fingerprintProtection
+        popupAllowedSites = try c.decodeIfPresent(Set<String>.self, forKey: .popupAllowedSites) ?? d.popupAllowedSites
+        cameraSites = try c.decodeIfPresent([String: Bool].self, forKey: .cameraSites) ?? d.cameraSites
+        microphoneSites = try c.decodeIfPresent([String: Bool].self, forKey: .microphoneSites) ?? d.microphoneSites
+        scanDownloads = try c.decodeIfPresent(Bool.self, forKey: .scanDownloads) ?? d.scanDownloads
         scriptLevel = try c.decodeIfPresent(ScriptLevel.self, forKey: .scriptLevel) ?? d.scriptLevel
         siteScriptLevels = try c.decodeIfPresent([String: ScriptLevel].self, forKey: .siteScriptLevels) ?? d.siteScriptLevels
         linkCheckerEnabled = try c.decodeIfPresent(Bool.self, forKey: .linkCheckerEnabled) ?? d.linkCheckerEnabled

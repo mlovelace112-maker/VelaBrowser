@@ -269,6 +269,12 @@ private struct DownloadRow: View {
                     .foregroundStyle(item.state == .finished || item.state == .downloading ? Nightglass.mutedText : color)
                     .lineLimit(3)
                     .fixedSize(horizontal: false, vertical: true)
+                if item.state == .finished, let scan = scanText {
+                    Label(scan.text, systemImage: scan.icon)
+                        .font(.system(size: 11, weight: .medium))
+                        .foregroundStyle(scan.color)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
             }
 
             Spacer(minLength: 0)
@@ -279,6 +285,11 @@ private struct DownloadRow: View {
                     .buttonStyle(IconButtonStyle(size: 24))
                     .help("Cancel")
             case .finished:
+                if case .flagged = item.scan {
+                    Button { manager.trash(item) } label: { Image(systemName: "trash") }
+                        .buttonStyle(IconButtonStyle(size: 24))
+                        .help("Move to Trash")
+                }
                 Button { manager.reveal(item) } label: { Image(systemName: "magnifyingglass") }
                     .buttonStyle(IconButtonStyle(size: 24))
                     .help("Show in Finder")
@@ -289,6 +300,26 @@ private struct DownloadRow: View {
         .padding(8)
         .contentShape(Rectangle())
         .onTapGesture(count: 2) { if item.state == .finished { manager.open(item) } }
+        .contextMenu {
+            if let hash = item.sha256 {
+                Button("Copy SHA-256 Fingerprint") {
+                    NSPasteboard.general.clearContents()
+                    NSPasteboard.general.setString(hash, forType: .string)
+                }
+            }
+        }
+    }
+
+    /// The VirusTotal result, if there is one.
+    private var scanText: (text: String, icon: String, color: Color)? {
+        switch item.scan {
+        case .none: nil
+        case .scanning: ("Scanning with VirusTotal…", "hourglass", Nightglass.mutedText)
+        case .clean(let checked): ("No threats found by \(checked) antivirus engines", "checkmark.shield.fill", Nightglass.safe)
+        case .flagged(let harmful, let checked): ("\(harmful) of \(checked) antivirus engines flag this file as harmful. Don't open it.", "xmark.shield.fill", Nightglass.danger)
+        case .unknown: ("VirusTotal hasn't seen this file before", "questionmark.circle", Nightglass.mutedText)
+        case .failed(let reason): (reason, "exclamationmark.circle", Nightglass.mutedText)
+        }
     }
 
     private var status: String {
@@ -458,6 +489,8 @@ struct SecuritySettingsTab: View {
             }
 
             SafeBrowsingSection()
+
+            DownloadScanSection()
 
             Section("Downloads") {
                 Toggle(isOn: store.privacyBinding(\.blockDangerousDownloads)) {

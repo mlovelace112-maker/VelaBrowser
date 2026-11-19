@@ -80,6 +80,8 @@ struct BrowserCommands: Commands {
         CommandGroup(after: .textEditing) {
             Button("Find on Page…") { store.showFindBar() }
                 .keyboardShortcut("f")
+            Button("Fill Private Email Address") { Task { await store.fillPrivateEmail() } }
+                .keyboardShortcut("e", modifiers: [.command, .option])
         }
 
         // View menu: sidebar and zoom
@@ -109,6 +111,8 @@ struct BrowserCommands: Commands {
                 Task { await store.toggleReader() }
             }
             .keyboardShortcut("r", modifiers: [.command, .shift])
+            Button("Picture in Picture") { Task { await store.togglePictureInPicture() } }
+                .keyboardShortcut("v", modifiers: [.command, .option])
             Divider()
         }
 
@@ -150,6 +154,9 @@ struct BrowserCommands: Commands {
             Button("Duplicate Tab") {
                 if let tab = store.selectedTab { store.duplicate(tab) }
             }
+            Divider()
+            Button("Put Other Tabs to Sleep") { store.sleepOtherTabs() }
+            Button("Site Settings…") { store.isSiteSettingsVisible = true }
         }
     }
 }
