@@ -4,6 +4,16 @@
     <title>Vela</title>
     <description>Updates for the Vela browser</description>
     <item>
+      <title>Vela 1.0-beta.16</title>
+      <pubDate>Thu, 19 Nov 2026 21:31:13 GMT</pubDate>
+      <sparkle:version>16</sparkle:version>
+      <sparkle:shortVersionString>1.0-beta.16</sparkle:shortVersionString>
+      <sparkle:minimumSystemVersion>15.0</sparkle:minimumSystemVersion>
+      <sparkle:channel>beta</sparkle:channel>
+      <description>&lt;p&gt;A beta build with the newest changes.&lt;/p&gt;&lt;ul&gt;&lt;li&gt;Make the shield panel scroll instead of running off the screen&lt;/li&gt;&lt;/ul&gt;</description>
+      <enclosure url="https://github.com/mlovelace112-maker/VelaBrowser/releases/download/v1.0-beta.16/Vela-1.0-beta.16.zip" sparkle:edSignature="ijo0BRpqvfQP+KNPd2TUjdUSNLjdQKShQTPyDmr5vRSILGVpAewtYRQqXM7tfttztaFOsmLeFAJQl6+LcVhlBw==" length="7100489" type="application/octet-stream" />
+    </item>
+    <item>
       <title>Vela 1.0-beta.15</title>
       <pubDate>Thu, 19 Nov 2026 20:43:49 GMT</pubDate>
       <sparkle:version>15</sparkle:version>
