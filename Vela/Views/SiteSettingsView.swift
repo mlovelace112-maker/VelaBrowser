@@ -234,13 +234,20 @@ struct EmailMaskingSection: View {
                     .foregroundStyle(Nightglass.mutedText)
                     .fixedSize(horizontal: false, vertical: true)
             } else if masking.isWaitingForPassphrase {
-                Text("DuckDuckGo emailed a one-time passphrase to the inbox your Duck Address forwards to. Paste it here.")
+                Text("DuckDuckGo emailed a one-time passphrase to the inbox \(masking.username ?? "your Duck Address")@duck.com forwards to. It can take a minute, and may land in spam. Paste the four words here.")
                     .fixedSize(horizontal: false, vertical: true)
                 HStack {
-                    TextField("Passphrase", text: $passphrase)
+                    TextField("Four words, like apple tiger moon river", text: $passphrase)
+                        .onSubmit { Task { await masking.signIn(passphrase: passphrase) } }
                     Button("Sign In") { Task { await masking.signIn(passphrase: passphrase) } }
                         .disabled(passphrase.trimmingCharacters(in: .whitespaces).isEmpty || masking.isWorking)
                 }
+                Button("Use a Different Address") {
+                    passphrase = ""
+                    masking.startOver()
+                }
+                .buttonStyle(.link)
+                .font(.system(size: 12))
             } else {
                 HStack {
                     TextField("yourname@duck.com", text: $address)
