@@ -31,6 +31,7 @@ struct ClaudePanel: View {
             }
         }
         .frame(width: 360)
+        .clipped() // keep wide content (long code lines) from pushing the panel off-screen
         .background(VisualEffectBackground())
         .overlay(alignment: .leading) {
             Rectangle().fill(Nightglass.stroke).frame(width: 1)
