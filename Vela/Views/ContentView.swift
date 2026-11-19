@@ -11,7 +11,11 @@ struct ContentView: View {
 
         VStack(spacing: 0) {
             VStack(spacing: 0) {
-                TabStripView()
+                if store.verticalTabs {
+                    WindowDragBar()
+                } else {
+                    TabStripView()
+                }
                 ToolbarView()
                     .zIndex(1)
                 if Appearance.shared.settings.showBookmarksBar {
@@ -31,12 +35,33 @@ struct ContentView: View {
             .zIndex(1)
 
             HStack(spacing: 0) {
+                if store.verticalTabs {
+                    VerticalTabsView()
+                        .transition(.move(edge: .leading).combined(with: .opacity))
+                }
                 if store.isSidebarVisible {
                     SidebarView()
                         .transition(.move(edge: .leading).combined(with: .opacity))
                 }
 
-                PageArea()
+                // Split view: two pages side by side. The one you're typing
+                // in gets the full page area; the other is a SplitPane.
+                if let partner = store.splitPartner, let focused = store.selectedTab {
+                    let focusedIsLeft = store.splitPair?.left == focused.id
+                    HStack(spacing: 0) {
+                        if focusedIsLeft {
+                            PageArea().overlay(alignment: .top) { focusLine }
+                            Rectangle().fill(Nightglass.stroke).frame(width: 1)
+                            SplitPane(tab: partner)
+                        } else {
+                            SplitPane(tab: partner)
+                            Rectangle().fill(Nightglass.stroke).frame(width: 1)
+                            PageArea().overlay(alignment: .top) { focusLine }
+                        }
+                    }
+                } else {
+                    PageArea()
+                }
 
                 if store.isClaudePanelVisible {
                     ClaudePanel()
@@ -55,6 +80,8 @@ struct ContentView: View {
         .ignoresSafeArea()
         .background(Nightglass.background)
         .animation(Nightglass.spring, value: store.isSidebarVisible)
+        .animation(Nightglass.spring, value: store.verticalTabs)
+        .animation(Nightglass.spring, value: store.splitPair)
         .animation(Nightglass.spring, value: store.isClaudePanelVisible)
         .animation(Nightglass.spring, value: store.spotify.isBarVisible)
         .animation(Nightglass.spring, value: store.isFindBarVisible)
@@ -76,6 +103,11 @@ struct ContentView: View {
         } message: {
             Text(store.downloadManager.pendingWarning?.reason ?? "")
         }
+    }
+
+    /// Marks the page you're typing in when two are side by side.
+    private var focusLine: some View {
+        Rectangle().fill(Nightglass.accent.opacity(0.8)).frame(height: 2)
     }
 
     private var downloadQuestion: String {

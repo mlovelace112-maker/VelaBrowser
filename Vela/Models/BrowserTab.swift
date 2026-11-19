@@ -27,6 +27,8 @@ final class BrowserTab: Identifiable {
     var groupID: UUID?
     /// Pinned tabs stay small at the left of the tab strip.
     var isPinned = false
+    /// The container (separate cookie jar) this tab lives in, if any.
+    var containerID: UUID?
     /// Tracker companies the shield caught on the current page.
     var trackersFound: [String] = []
     /// Pop-ups the shield stopped on the current page.

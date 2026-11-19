@@ -127,8 +127,18 @@ struct PageMenu: View {
         Menu {
             Button("New Tab") { store.newTab() }
             Button("New Private Tab") { store.newTab(isPrivate: true) }
+            Menu("New Tab in Container") {
+                ForEach(store.containers) { container in
+                    Button { store.newTab(container: container.id) } label: { Label(container.name, systemImage: container.icon) }
+                }
+            }
             Button("Reopen Closed Tab") { store.reopenClosedTab() }
                 .disabled(!store.canReopenClosedTab)
+            Divider()
+            Button(store.splitPair == nil ? "Split View with New Tab" : "Close Split View") {
+                if store.splitPair == nil { store.openSplitViewWithNewTab() } else { store.closeSplitView() }
+            }
+            Toggle("Vertical Tabs", isOn: Binding(get: { store.verticalTabs }, set: { store.verticalTabs = $0 }))
             Divider()
             Button("Passwords…") { store.isPasswordsVisible = true }
             Divider()
@@ -227,6 +237,9 @@ struct AddressBar: View {
             .accessibilityLabel("Site information")
             .popover(isPresented: $showsSiteInfo, arrowEdge: .bottom) { SiteInfoView(tab: tab) }
 
+            if let container = store.container(for: tab) {
+                ContainerBadge(container: container)
+            }
             if tab.isPrivate {
                 Text("Private")
                     .font(.system(size: 11, weight: .semibold))

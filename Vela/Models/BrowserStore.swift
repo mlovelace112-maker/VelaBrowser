@@ -14,9 +14,20 @@ import WebKit
 final class BrowserStore {
     var tabs: [BrowserTab] = []
     var groups: [TabGroup] = []
+    /// Separate cookie jars for tabs (Personal, Work…). See Containers.swift.
+    var containers: [TabContainer] = BrowserStore.loadContainers()
+    @ObservationIgnored var containerConfigurations: [UUID: WKWebViewConfiguration] = [:]
+    /// Two tabs side by side, or nil. See Containers.swift.
+    var splitPair: SplitPair?
+    /// Tabs in a list down the left side instead of along the top.
+    var verticalTabs = UserDefaults.standard.bool(forKey: "vela.verticalTabs") {
+        didSet { UserDefaults.standard.set(verticalTabs, forKey: "vela.verticalTabs") }
+    }
     var selectedTabID: UUID? {
         didSet {
             guard selectedTabID != oldValue else { return }
+            // Picking a tab outside split view leaves split view.
+            if let pair = splitPair, !pair.contains(selectedTabID) { splitPair = nil }
             // Remember when you left the old tab (for tab sleeping), and
             // wake the new one if it was asleep.
             tabs.first { $0.id == oldValue }?.lastActive = Date()
@@ -161,14 +172,18 @@ final class BrowserStore {
     // MARK: - Tabs
 
     @discardableResult
-    func newTab(url: URL? = nil, opener: BrowserTab? = nil, isPrivate: Bool = false, select: Bool = true) -> BrowserTab {
+    func newTab(url: URL? = nil, opener: BrowserTab? = nil, isPrivate: Bool = false, select: Bool = true, container: UUID?? = nil) -> BrowserTab {
         let makePrivate = isPrivate || (opener?.isPrivate ?? false)
+        // A tab opened from a container tab stays in that container, unless
+        // a container (or none) was asked for.
+        let containerID = makePrivate ? nil : (container ?? opener?.containerID)
         let tab = BrowserTab(
-            configuration: makePrivate ? privateConfiguration : configuration,
+            configuration: makePrivate ? privateConfiguration : configuration(forContainer: containerID),
             isPrivate: makePrivate,
             ruleList: ruleList,
             privacy: privacy
         )
+        tab.containerID = containerID
         connect(tab)
 
         // Open next to the tab that opened it, inside the same group.
@@ -189,6 +204,7 @@ final class BrowserStore {
     /// It opens as a tab next to the page, still linked to it.
     func openWindow(configuration: WKWebViewConfiguration, url: URL?, opener: BrowserTab) -> WKWebView {
         let tab = BrowserTab(popupConfiguration: configuration, isPrivate: opener.isPrivate, url: url)
+        tab.containerID = opener.containerID
         connect(tab)
         if let index = tabs.firstIndex(where: { $0.id == opener.id }) {
             tab.groupID = opener.isPinned ? nil : opener.groupID
@@ -270,10 +286,11 @@ final class BrowserStore {
     func close(_ tab: BrowserTab) {
         guard let index = tabs.firstIndex(where: { $0.id == tab.id }) else { return }
         if let url = tab.url {
-            recentlyClosed.append(ClosedTab(url: url, groupID: tab.groupID, isPrivate: tab.isPrivate))
+            recentlyClosed.append(ClosedTab(url: url, groupID: tab.groupID, isPrivate: tab.isPrivate, containerID: tab.containerID))
             if recentlyClosed.count > 20 { recentlyClosed.removeFirst() }
         }
         tab.webView.stopLoading()
+        if splitPair?.contains(tab.id) == true { splitPair = nil }
         tabs.remove(at: index)
         removeEmptyGroups()
 
@@ -297,7 +314,7 @@ final class BrowserStore {
     /// ⇧⌘T: brings back the most recently closed tab.
     func reopenClosedTab() {
         guard let closed = recentlyClosed.popLast() else { return }
-        let tab = newTab(url: closed.url, isPrivate: closed.isPrivate)
+        let tab = newTab(url: closed.url, isPrivate: closed.isPrivate, container: closed.containerID)
         if let groupID = closed.groupID, groups.contains(where: { $0.id == groupID }) {
             tab.groupID = groupID
         }
@@ -719,6 +736,7 @@ final class BrowserStore {
         var title: String
         var isPinned: Bool
         var groupID: UUID?
+        var containerID: UUID?
     }
 
     /// Saves your open tabs (never private ones) so the next launch can reopen them.
@@ -733,7 +751,7 @@ final class BrowserStore {
                 && ["http", "https"].contains(tab.url?.scheme?.lowercased() ?? "")
         }
         let saved = kept.compactMap { tab in
-            tab.url.map { SavedTab(url: $0, title: tab.title, isPinned: tab.isPinned, groupID: tab.groupID) }
+            tab.url.map { SavedTab(url: $0, title: tab.title, isPinned: tab.isPinned, groupID: tab.groupID, containerID: tab.containerID) }
         }
         let usedGroups = groups.filter { group in saved.contains { $0.groupID == group.id } }
         let session = SavedSession(tabs: saved, groups: usedGroups, selected: kept.firstIndex { $0.id == selectedTabID })
@@ -750,7 +768,8 @@ final class BrowserStore {
               !session.tabs.isEmpty else { return false }
         groups = session.groups
         for saved in session.tabs {
-            let tab = BrowserTab(configuration: configuration, ruleList: ruleList, privacy: privacy)
+            let tab = BrowserTab(configuration: configuration(forContainer: saved.containerID), ruleList: ruleList, privacy: privacy)
+            tab.containerID = containers.contains { $0.id == saved.containerID } ? saved.containerID : nil
             connect(tab)
             tab.isPinned = saved.isPinned
             tab.groupID = saved.isPinned ? nil : saved.groupID
@@ -779,7 +798,8 @@ final class BrowserStore {
     func sleepIdleTabs(force: Bool = false) async {
         guard force || tabSleepMinutes > 0 else { return }
         let cutoff = Date().addingTimeInterval(-Double(tabSleepMinutes) * 60)
-        for tab in tabs where tab.id != selectedTabID && !tab.isAsleep && !tab.isPinned && tab.url != nil {
+        for tab in tabs where tab.id != selectedTabID && !tab.isAsleep && !tab.isPinned && tab.url != nil
+            && splitPair?.contains(tab.id) != true {
             guard force || tab.lastActive < cutoff else { continue }
             if tab.isLoading || tab.isUsingCamera || tab.isUsingMicrophone || tab.permissionRequest != nil { continue }
             if await tab.webView.requestMediaPlaybackState() == .playing { continue }

@@ -81,6 +81,7 @@ struct GeneralSettingsTab: View {
             }
 
             TabsSettingsSection()
+            ContainersSettingsSection()
 
             UpdatesSection()
 
