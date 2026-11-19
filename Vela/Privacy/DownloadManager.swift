@@ -61,6 +61,8 @@ final class DownloadManager {
 
     /// Reads your current privacy settings (set by BrowserStore).
     @ObservationIgnored var settings: @MainActor () -> PrivacySettings = { PrivacySettings() }
+    /// Asks Google Safe Browsing about a file's address (set by BrowserStore).
+    @ObservationIgnored var checkThreat: (@MainActor (URL) async -> SafeBrowsingThreat?)?
 
     @ObservationIgnored private let delegate = DownloadDelegate()
     @ObservationIgnored private var itemsByDownload: [ObjectIdentifier: DownloadItem] = [:]
@@ -129,6 +131,13 @@ final class DownloadManager {
         guard let item = itemsByDownload[ObjectIdentifier(download)] else { return nil }
         let name = DownloadGuard.cleanFilename(suggestedFilename)
         item.filename = name
+
+        if settings().safeBrowsingEnabled, let source = response.url ?? item.sourceURL,
+           let threat = await checkThreat?(source) {
+            item.state = .blocked(threat.reason + ".")
+            stopTracking(item)
+            return nil
+        }
 
         if settings().blockDangerousDownloads {
             let verdict = DownloadGuard.assess(

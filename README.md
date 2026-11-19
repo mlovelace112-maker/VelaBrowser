@@ -64,6 +64,7 @@ The first build takes a minute. If Xcode asks about signing, choose **Sign to Ru
 | **Dangerous link warning** | Links that look like phishing (a fake "@" address, a brand name on the wrong site with "login" or "verify" in it…) are stopped with a warning page. **Go Back** or **Open Anyway**. |
 | **Downloads** | A downloads button appears in the toolbar with a progress ring. Click it to see your files, cancel, or show them in Finder. |
 | **Malicious download blocking** | Windows programs (.exe, .scr, .bat…), disguised files ("invoice.pdf.exe"), names with hidden flip characters, and anything from an ad network are blocked. Apps, installers, scripts and macro documents ask first. Hidden frames can't start downloads. |
+| **Google Safe Browsing** | Optional. Add a free API key in Settings ▸ Security and Vela checks each new page and download against Google's list of malware and phishing sites (the one Safari and Chrome use). Only the site and path are sent, never the part after "?". |
 | **macOS quarantine** | Every download is tagged "downloaded from the internet", so Gatekeeper and XProtect check apps before they open. |
 
 ### Passwords
@@ -155,7 +156,7 @@ WebKit compiles the list once (`WKContentRuleListStore`) and applies it to every
 
 **Async delegate methods.** WebKit asks "should this page load?" through `decidePolicyFor`. Vela uses the `async` versions, so code like "ask the user whether to keep this download, *then* answer WebKit" reads top to bottom instead of being split across callbacks. See `DownloadManager.destination(for:…)`.
 
-**What the link and download checks can't do.** They run entirely on your Mac and look at the *shape* of addresses and file names. They can't recognize a brand-new scam site with an ordinary name. That needs an online threat list such as Google Safe Browsing (free, needs an API key), which could be added later.
+**What the link and download checks can't do.** They run entirely on your Mac and look at the *shape* of addresses and file names. They can't recognize a brand-new scam site with an ordinary name. That's what the optional Google Safe Browsing check is for (`Privacy/SafeBrowsing.swift`).
 
 **Keychain prompts after rebuilding.** Vela is signed "to run locally", so each rebuild looks like a slightly different app to the Keychain, and macOS may ask for your Mac password to let Vela read its saved passwords. Click **Always Allow**. Signing with your free Apple ID team in Xcode (Signing & Capabilities ▸ Team) makes this go away.
 

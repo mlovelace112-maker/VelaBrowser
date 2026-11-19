@@ -316,6 +316,49 @@ struct PasswordSaveBanner: View {
 
 // MARK: - Settings
 
+/// Settings ▸ Security ▸ Google Safe Browsing: the switch and the API key.
+private struct SafeBrowsingSection: View {
+    @Environment(BrowserStore.self) private var store
+    @State private var keyDraft = ""
+
+    var body: some View {
+        let safeBrowsing = store.safeBrowsing
+
+        Section {
+            Toggle(isOn: store.privacyBinding(\.safeBrowsingEnabled)) {
+                Text("Check sites with Google Safe Browsing")
+                Text("Stops known malware and phishing sites and downloads. Sends the address of each new page (without anything after “?”) to Google.")
+            }
+            if safeBrowsing.hasKey {
+                HStack {
+                    Label("API key saved in your Keychain", systemImage: "checkmark.seal.fill")
+                        .foregroundStyle(Nightglass.safe)
+                    Spacer()
+                    Button("Remove Key") { safeBrowsing.setKey("") }
+                        .controlSize(.small)
+                }
+            } else {
+                HStack {
+                    SecureField("Paste your API key", text: $keyDraft)
+                    Button("Save") {
+                        safeBrowsing.setKey(keyDraft)
+                        keyDraft = ""
+                    }
+                    .disabled(keyDraft.trimmingCharacters(in: .whitespaces).isEmpty)
+                }
+            }
+        } header: {
+            Text("Google Safe Browsing")
+        } footer: {
+            if !safeBrowsing.hasKey {
+                Text("Get a free key: console.cloud.google.com ▸ enable “Safe Browsing API” ▸ Credentials ▸ Create API key.")
+                    .font(.system(size: 11.5))
+                    .foregroundStyle(Nightglass.mutedText)
+            }
+        }
+    }
+}
+
 /// The Security tab of Settings (⌘,).
 struct SecuritySettingsTab: View {
     @Environment(BrowserStore.self) private var store
@@ -363,6 +406,8 @@ struct SecuritySettingsTab: View {
                 }
                 .disabled(!privacy.linkCheckerEnabled)
             }
+
+            SafeBrowsingSection()
 
             Section("Downloads") {
                 Toggle(isOn: store.privacyBinding(\.blockDangerousDownloads)) {

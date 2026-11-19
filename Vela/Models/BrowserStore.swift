@@ -40,6 +40,7 @@ final class BrowserStore {
     // Security
     let downloadManager = DownloadManager()
     let passwordVault = PasswordVault()
+    let safeBrowsing = SafeBrowsing()
     var isPasswordsVisible = false
     /// "Save password?" waiting for an answer.
     var passwordPrompt: PasswordPrompt?
@@ -69,6 +70,7 @@ final class BrowserStore {
         history = Self.loadHistory()
         applyPopupSetting()
         downloadManager.settings = { [weak self] in self?.privacy ?? PrivacySettings() }
+        downloadManager.checkThreat = { [weak self] url in await self?.safeBrowsing.check(url) }
         newTab()
         Task { await refreshBlockingRules() }
     }
@@ -124,6 +126,7 @@ final class BrowserStore {
     /// Hooks a tab up to the store: history, the shield, downloads and passwords.
     private func connect(_ tab: BrowserTab) {
         tab.settings = { [weak self] in self?.privacy ?? PrivacySettings() }
+        tab.checkThreat = { [weak self] url in await self?.safeBrowsing.check(url) }
         tab.onOpenInNewTab = { [weak self, weak tab] url in
             self?.newTab(url: url, opener: tab)
         }

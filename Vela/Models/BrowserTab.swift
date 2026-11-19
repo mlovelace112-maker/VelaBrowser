@@ -60,6 +60,8 @@ final class BrowserTab: Identifiable {
     @ObservationIgnored var onLoginFormFound: (@MainActor (String) -> Void)?
     /// Called when you submit a login: host, username, password.
     @ObservationIgnored var onLoginSubmitted: (@MainActor (String, String, String) -> Void)?
+    /// Asks Google Safe Browsing about an address (set by BrowserStore).
+    @ObservationIgnored var checkThreat: (@MainActor (URL) async -> SafeBrowsingThreat?)?
     /// Reads your current privacy settings (set by BrowserStore).
     @ObservationIgnored var settings: @MainActor () -> PrivacySettings = { PrivacySettings() }
 
@@ -304,6 +306,14 @@ final class TabCoordinator: NSObject, WKNavigationDelegate, WKUIDelegate, WKScri
                     tab.linkWarning = LinkWarning(url: url, report: report)
                     return (.cancel, preferences)
                 }
+            }
+            // Google Safe Browsing: known malware and phishing sites.
+            if settings.safeBrowsingEnabled, !isRevisit, !tab.allowedDangerousURLs.contains(url),
+               let threat = await tab.checkThreat?(url) {
+                var report = LinkReport()
+                report.flag(.dangerous, threat.reason)
+                tab.linkWarning = LinkWarning(url: url, report: report)
+                return (.cancel, preferences)
             }
             tab.linkWarning = nil
         }

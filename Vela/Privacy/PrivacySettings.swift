@@ -78,6 +78,8 @@ struct PrivacySettings: Codable, Equatable {
     var linkCheckerEnabled = true
     var warnBeforeDangerousLinks = true
     var blockDangerousDownloads = true
+    /// Check pages and downloads against Google Safe Browsing (needs an API key).
+    var safeBrowsingEnabled = true
 
     // Passwords
     var offerToSavePasswords = true
@@ -159,6 +161,7 @@ struct PrivacySettings: Codable, Equatable {
         linkCheckerEnabled = try c.decodeIfPresent(Bool.self, forKey: .linkCheckerEnabled) ?? d.linkCheckerEnabled
         warnBeforeDangerousLinks = try c.decodeIfPresent(Bool.self, forKey: .warnBeforeDangerousLinks) ?? d.warnBeforeDangerousLinks
         blockDangerousDownloads = try c.decodeIfPresent(Bool.self, forKey: .blockDangerousDownloads) ?? d.blockDangerousDownloads
+        safeBrowsingEnabled = try c.decodeIfPresent(Bool.self, forKey: .safeBrowsingEnabled) ?? d.safeBrowsingEnabled
         offerToSavePasswords = try c.decodeIfPresent(Bool.self, forKey: .offerToSavePasswords) ?? d.offerToSavePasswords
         neverSavePasswordSites = try c.decodeIfPresent(Set<String>.self, forKey: .neverSavePasswordSites) ?? d.neverSavePasswordSites
     }
