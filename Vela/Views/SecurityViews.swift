@@ -423,6 +423,7 @@ struct SecuritySettingsTab: View {
 
             Section("Passwords") {
                 Toggle("Offer to save passwords", isOn: store.privacyBinding(\.offerToSavePasswords))
+                Toggle("Fill saved passwords when I click a login box", isOn: store.privacyBinding(\.autoFillPasswords))
                 Button("Open Passwords…") { store.isPasswordsVisible = true }
                 if !privacy.neverSavePasswordSites.isEmpty {
                     ForEach(privacy.neverSavePasswordSites.sorted(), id: \.self) { site in
