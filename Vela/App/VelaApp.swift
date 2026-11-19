@@ -76,6 +76,10 @@ struct BrowserCommands: Commands {
                 store.isSidebarVisible.toggle()
             }
             .keyboardShortcut("l", modifiers: [.command, .shift])
+            Button(store.isClaudePanelVisible ? "Hide Claude" : "Show Claude") {
+                store.isClaudePanelVisible.toggle()
+            }
+            .keyboardShortcut("a", modifiers: [.command, .shift])
             Divider()
             Button("Zoom In") { store.selectedTab?.zoomIn() }
                 .keyboardShortcut("=")

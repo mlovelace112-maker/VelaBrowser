@@ -42,6 +42,10 @@ final class BrowserStore {
     let passwordVault = PasswordVault()
     let safeBrowsing = SafeBrowsing()
     var isPasswordsVisible = false
+
+    // Claude
+    let claude = ClaudeAssistant()
+    var isClaudePanelVisible = false
     /// "Save password?" waiting for an answer.
     var passwordPrompt: PasswordPrompt?
     /// The compiled blocking rules every tab uses.
@@ -72,6 +76,7 @@ final class BrowserStore {
         downloadManager.settings = { [weak self] in self?.privacy ?? PrivacySettings() }
         downloadManager.checkThreat = { [weak self] url in await self?.safeBrowsing.check(url) }
         newTab()
+        claude.store = self
         Task { await refreshBlockingRules() }
     }
 
@@ -333,6 +338,25 @@ final class BrowserStore {
             other.groupID = target.id
         }
         removeEmptyGroups()
+    }
+
+    /// Makes a group from these tabs (Claude uses this to group tabs by topic).
+    @discardableResult
+    func makeGroup(named name: String, color: GroupColor? = nil, tabs members: [BrowserTab]) -> TabGroup {
+        let group = TabGroup(name: name, color: color ?? nextGroupColor())
+        groups.append(group)
+        for tab in members {
+            tab.isPinned = false
+            tab.groupID = group.id
+        }
+        removeEmptyGroups()
+        return group
+    }
+
+    /// Opens the Claude panel and asks it something.
+    func askClaudeInPanel(_ text: String) {
+        isClaudePanelVisible = true
+        claude.send(text)
     }
 
     func addToNewGroup(_ tab: BrowserTab) {

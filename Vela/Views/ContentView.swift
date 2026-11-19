@@ -33,6 +33,11 @@ struct ContentView: View {
                 }
 
                 PageArea()
+
+                if store.isClaudePanelVisible {
+                    ClaudePanel()
+                        .transition(.move(edge: .trailing).combined(with: .opacity))
+                }
             }
             .sheet(isPresented: $store.isPasswordsVisible) {
                 PasswordsView()
@@ -41,6 +46,7 @@ struct ContentView: View {
         .ignoresSafeArea()
         .background(Nightglass.background)
         .animation(Nightglass.spring, value: store.isSidebarVisible)
+        .animation(Nightglass.spring, value: store.isClaudePanelVisible)
         .animation(Nightglass.spring, value: store.isFindBarVisible)
         .sheet(isPresented: $store.isCookieManagerVisible) {
             CookieManagerView()
@@ -66,7 +72,8 @@ struct ContentView: View {
 }
 
 /// The page itself, with everything that floats over it: the link bubble,
-/// dangerous-link warnings, "Save password?" and "Pop-up blocked".
+/// dangerous-link warnings, "Save password?", "Pop-up blocked" and Claude's
+/// quick answers.
 private struct PageArea: View {
     @Environment(BrowserStore.self) private var store
 
@@ -113,5 +120,14 @@ private struct PageArea: View {
             }
         }
         .animation(Nightglass.spring, value: store.blockedPopup)
+        .overlay(alignment: .top) {
+            if let answer = store.claude.quickAnswer {
+                QuickAnswerCard(answer: answer)
+                    .padding(.horizontal, 24)
+                    .padding(.top, 12)
+                    .transition(.move(edge: .top).combined(with: .opacity))
+            }
+        }
+        .animation(Nightglass.spring, value: store.claude.quickAnswer?.id)
     }
 }

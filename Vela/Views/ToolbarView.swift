@@ -79,6 +79,8 @@ struct ToolbarView: View {
                     .help("Share")
                 }
 
+                ClaudeButton()
+
                 PageMenu(tab: tab)
             }
         }
@@ -89,6 +91,22 @@ struct ToolbarView: View {
                 LoadingBar(progress: tab.progress)
             }
         }
+    }
+}
+
+/// The sparkle button that opens the Claude side panel.
+struct ClaudeButton: View {
+    @Environment(BrowserStore.self) private var store
+
+    var body: some View {
+        Button { withAnimation(Nightglass.spring) { store.isClaudePanelVisible.toggle() } } label: {
+            Image(systemName: "sparkle")
+                .foregroundStyle(store.isClaudePanelVisible ? Nightglass.claude : Nightglass.secondaryText)
+                .symbolEffect(.bounce, value: store.isClaudePanelVisible)
+                .symbolEffect(.pulse, isActive: store.claude.isWorking && !store.isClaudePanelVisible)
+        }
+        .buttonStyle(IconButtonStyle())
+        .help("Claude (⇧⌘A)")
     }
 }
 
@@ -105,6 +123,9 @@ struct PageMenu: View {
                 .disabled(!store.canReopenClosedTab)
             Divider()
             Button("Passwords…") { store.isPasswordsVisible = true }
+            Divider()
+            Button("Summarize Page with Claude") { store.askClaudeInPanel("Summarize this page.") }
+                .disabled(tab.url == nil || tab.isPrivate)
             Divider()
             Button("Find on Page…") { store.showFindBar() }
                 .disabled(tab.url == nil)
@@ -157,6 +178,9 @@ struct AddressBar: View {
     let tab: BrowserTab
     @State private var text = ""
     @FocusState private var isFocused: Bool
+    /// What you last typed, kept so "Ask Claude" works even if clicking it
+    /// takes focus away from the address bar first.
+    @State private var typed = ""
 
     var body: some View {
         let shape = RoundedRectangle(cornerRadius: 11, style: .continuous)
@@ -185,6 +209,30 @@ struct AddressBar: View {
                     store.navigate(text, in: tab)
                     isFocused = false
                 }
+                // Tab sends what you typed to Claude instead of searching.
+                .onKeyPress(.tab) {
+                    guard canAsk else { return .ignored }
+                    askClaude()
+                    return .handled
+                }
+
+            if isFocused && canAsk {
+                Button(action: askClaude) {
+                    HStack(spacing: 4) {
+                        Image(systemName: "sparkle")
+                        Text("Ask Claude")
+                        Text("⇥").opacity(0.65)
+                    }
+                    .font(.system(size: 11, weight: .semibold))
+                    .foregroundStyle(Nightglass.claude)
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 3)
+                    .background(Capsule().fill(Nightglass.claude.opacity(0.16)))
+                }
+                .buttonStyle(.plain)
+                .help("Ask Claude instead of searching (Tab)")
+                .transition(.scale(scale: 0.8).combined(with: .opacity))
+            }
 
             // Key: fill a saved password into this page's login form.
             if !tab.savedLogins.isEmpty {
@@ -232,11 +280,27 @@ struct AddressBar: View {
         )
         .shadow(color: Nightglass.accent.opacity(isFocused ? 0.3 : 0), radius: 10)
         .animation(.easeOut(duration: 0.2), value: isFocused)
+        .animation(.easeOut(duration: 0.15), value: isFocused && canAsk)
+        .onChange(of: text) { if isFocused { typed = text } }
         .onAppear { text = displayText }
         .onChange(of: tab.url) { if !isFocused { text = displayText } }
         .onChange(of: tab.id) { text = displayText }
         .onChange(of: isFocused) { if !isFocused { text = displayText } }
         .onChange(of: store.addressBarFocusRequest) { isFocused = true }
+    }
+
+    /// You've typed something other than the page's address.
+    private var canAsk: Bool {
+        let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        return !trimmed.isEmpty && trimmed != displayText
+    }
+
+    private func askClaude() {
+        let question = typed.isEmpty ? text : typed
+        store.claude.ask(question, about: tab)
+        typed = ""
+        isFocused = false
+        text = displayText
     }
 
     private var displayText: String {

@@ -10,6 +10,8 @@ struct SettingsView: View {
                 .tabItem { Label("Privacy", systemImage: "hand.raised") }
             SecuritySettingsTab()
                 .tabItem { Label("Security", systemImage: "lock.shield") }
+            ClaudeSettingsTab()
+                .tabItem { Label("Claude", systemImage: "sparkle") }
         }
         .frame(width: 560, height: 560)
     }

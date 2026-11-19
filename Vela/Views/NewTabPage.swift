@@ -1,7 +1,7 @@
 import SwiftUI
 
 /// What you see in a fresh tab: a greeting, a big glass search box and
-/// shortcuts to your first six bookmarks. Claude search plugs in here in step 4.
+/// shortcuts to your first six bookmarks. Press Tab to ask Claude instead of searching.
 struct NewTabPage: View {
     @Environment(BrowserStore.self) private var store
     let tab: BrowserTab
@@ -33,6 +33,24 @@ struct NewTabPage: View {
                     .textFieldStyle(.plain)
                     .font(.system(size: 17))
                     .onSubmit { store.navigate(query, in: tab) }
+                    .onKeyPress(.tab) {
+                        guard !query.trimmingCharacters(in: .whitespaces).isEmpty else { return .ignored }
+                        askClaude()
+                        return .handled
+                    }
+                if !query.trimmingCharacters(in: .whitespaces).isEmpty {
+                    Button(action: askClaude) {
+                        Label("Ask Claude", systemImage: "sparkle")
+                            .font(.system(size: 12, weight: .semibold))
+                            .foregroundStyle(Nightglass.claude)
+                            .padding(.horizontal, 10)
+                            .padding(.vertical, 6)
+                            .background(Capsule().fill(Nightglass.claude.opacity(0.16)))
+                    }
+                    .buttonStyle(.plain)
+                    .help("Ask Claude instead of searching (Tab)")
+                    .transition(.scale(scale: 0.8).combined(with: .opacity))
+                }
                 Button { store.navigate(query, in: tab) } label: {
                     Image(systemName: "arrow.up")
                         .font(.system(size: 15, weight: .bold))
@@ -81,6 +99,11 @@ struct NewTabPage: View {
         }
         .padding(40)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
+    }
+
+    private func askClaude() {
+        store.claude.ask(query, about: nil)
+        query = ""
     }
 
     private var greeting: String {

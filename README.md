@@ -76,6 +76,16 @@ The first build takes a minute. If Xcode asks about signing, choose **Sign to Ru
 | **Generator** | The Passwords window makes strong random passwords. Copied passwords are hidden from clipboard-history apps and cleared after 90 seconds. |
 | **Passkeys** | Not yet. macOS only lets browsers that Apple has approved use passkeys (an entitlement Apple grants to browser makers). |
 
+### Claude
+| Feature | How to use it |
+|---|---|
+| **Set up** | Get an API key at [console.anthropic.com](https://console.anthropic.com/settings/keys) and paste it in Settings ▸ Claude (or in the Claude panel). It's kept in your Keychain. Usage is billed to that Anthropic account. |
+| **Ask from the address bar** | Type a question and press **Tab** (or click **Ask Claude ⇥**) instead of Return. Haiku 5.5 answers in a card over the page. **Continue in Side Panel** carries the conversation over. Works on the New Tab page too. |
+| **Side panel** | ⇧⌘A or the ✦ button. Chat with Haiku 5.5, Sonnet 5.5 or Opus 5.5 (switching models starts a new chat). Links in answers open in new tabs. |
+| **Browser control** | In the panel, Claude can list your tabs, read and summarize a page, open addresses and searches, switch tabs, go back, click links and buttons, group tabs (by site or by topic) and close tabs. Each action shows as a chip in the chat. |
+| **Asks first** | Closing tabs and clicks that would send a form show an **Allow / Don't Allow** card. **Stop** cancels at any point. |
+| **Privacy** | Claude sees a page's text only when it reads that page. Private tabs are never shared. Page text is marked as untrusted, and Claude is told never to follow instructions hidden in it. |
+
 ### Look and feel
 | Feature | How to use it |
 |---|---|
@@ -89,8 +99,8 @@ The app also has a custom icon: a "V" drawn as the Vela constellation. Its sourc
 1. ✅ Mockups. See the design canvas.
 2. ✅ Core browser: tabs, tab groups, address bar, bookmarks, plus Safari-style extras: a sidebar, history, find, zoom, private tabs, pinned tabs and a custom icon. 
 3. ✅ Privacy: pop-up blocker, ad and tracker blocking, cookie manager.
-3½. ✅ Security and looks: passwords, link checker, safe downloads, script slider, pop-under and stronger ad blocking, themes. **← you are here**
-4. ⏳ Extras: Claude in the address bar and side panel, image and video search, the Spotify player.
+3½. ✅ Security and looks: passwords, link checker, safe downloads, script slider, pop-under and stronger ad blocking, themes.
+4. ⏳ Extras: ✅ Claude in the address bar and side panel **← you are here**, then the Spotify player, image and video search.
 
 ## How the code is organized
 
@@ -106,6 +116,10 @@ Vela/
     DownloadManager.swift    Downloads, the download guard, and macOS quarantine.
   Passwords/
     PasswordVault.swift      The Keychain password store, Touch ID, the generator, fill scripts.
+  Claude/
+    ClaudeClient.swift       Talks to the Claude API: streaming replies, models, the Keychain key.
+    ClaudeAssistant.swift    The chat, quick answers and the tool loop.
+    BrowserTools.swift       The browser actions Claude can take, and how its requests are checked.
   Assets.xcassets            The app icon and accent color.
   Models/                    The "brain": data and logic, no drawing.
     BrowserStore.swift       All tabs, groups, bookmarks and history, plus the actions on them.
@@ -122,6 +136,7 @@ Vela/
     ShieldViews.swift        Shield button and panel, privacy switches, script slider, "Pop-up blocked" notice.
     SecurityViews.swift      Link bubble, dangerous-link warning, downloads, "Save password?", Security settings.
     PasswordsView.swift      The Passwords window (⌥⌘P).
+    ClaudeViews.swift        The Claude panel, the quick-answer card and Settings ▸ Claude.
     SettingsView.swift       The Settings window and its Appearance tab.
     CookieManagerView.swift  The cookie manager and the Privacy settings tab.
     BookmarksBarView.swift   The bookmarks row.
@@ -160,11 +175,21 @@ WebKit compiles the list once (`WKContentRuleListStore`) and applies it to every
 
 **Keychain prompts after rebuilding.** Vela is signed "to run locally", so each rebuild looks like a slightly different app to the Keychain, and macOS may ask for your Mac password to let Vela read its saved passwords. Click **Always Allow**. Signing with your free Apple ID team in Xcode (Signing & Capabilities ▸ Team) makes this go away.
 
+## The big ideas in step 4: Claude
+
+**Streaming.** Vela asks for `"stream": true`, so the API sends the reply as a series of small "server-sent events" (`content_block_delta` and friends) instead of one big answer. `ClaudeClient.stream` reads them line by line with `URLSession.bytes(for:)` and rebuilds Claude's reply as it goes, which is why words appear as Claude writes them.
+
+**Tool use is a loop.** Vela sends Claude a list of tools (`BrowserTools.definitions`). When Claude wants one, it stops with `stop_reason: "tool_use"`. Vela runs the tool, sends back a `tool_result`, and asks again, until Claude stops for good (`ClaudeAssistant.runConversation`). Claude's earlier replies go back exactly as they came, including its private "thinking" blocks, which is why switching models starts a new chat.
+
+**Never trust the input.** Claude's tool requests are checked before anything happens: wrong types, unknown tabs and cut-off input are sent back to Claude as errors. Web pages are treated the same way: their text is labeled untrusted, private tabs are off limits, and anything destructive waits for your click.
+
 ## Good first experiments
 
 - Change `Nightglass.accent` in `Theme/Nightglass.swift` to another color, such as `Color(hex: 0x4FD1A5)`, and run again.
 - Change the search engine in `BrowserStore.url(from:)`.
 - Add a domain to `ContentBlocker.trackerDomains` to block it everywhere.
 - Add your own theme to `Theme.all` in `Theme/Appearance.swift`.
+- Give Claude a new tool: add it to `BrowserTools.definitions` and handle it in `BrowserTools.run`. A "scroll down" or "find on page" tool is a good start.
+- Change the suggestions in the empty Claude panel (`EmptyChat` in `Views/ClaudeViews.swift`).
 - Add a brand to `LinkChecker.brands` so look-alike sites get flagged.
 - Edit the starter bookmarks in `BrowserStore.loadBookmarks()`. Starter bookmarks only appear the first time, so delete your saved ones from the bookmarks bar to see the change.
