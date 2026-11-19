@@ -1,3 +1,4 @@
+import AppKit
 import Foundation
 import Observation
 import Sparkle
@@ -40,6 +41,16 @@ final class Updater: NSObject, SPUUpdaterDelegate {
         }
     }
 
+    /// Download and install updates by themselves (when you quit Vela).
+    /// Security fixes then reach you without a click.
+    var installsAutomatically: Bool {
+        didSet { controller?.updater.automaticallyDownloadsUpdates = installsAutomatically }
+    }
+
+    /// Set when macOS has an update waiting (it often includes security
+    /// fixes for WebKit, the engine Vela and Safari use for web pages).
+    private(set) var pendingMacOSUpdate: String?
+
     /// Whether Vela checks once a day by itself.
     var checksAutomatically: Bool {
         didSet { controller?.updater.automaticallyChecksForUpdates = checksAutomatically }
@@ -58,6 +69,7 @@ final class Updater: NSObject, SPUUpdaterDelegate {
     override init() {
         getsBetaUpdates = UserDefaults.standard.bool(forKey: Self.betaKey)
         checksAutomatically = true
+        installsAutomatically = true
         super.init()
     }
 
@@ -82,8 +94,45 @@ final class Updater: NSObject, SPUUpdaterDelegate {
         )
         self.controller = controller
         checksAutomatically = controller.updater.automaticallyChecksForUpdates
+        // Install updates automatically unless you've turned that off.
+        let autoKey = "vela.updates.autoInstallChosen"
+        if !UserDefaults.standard.bool(forKey: autoKey) {
+            controller.updater.automaticallyDownloadsUpdates = true
+            UserDefaults.standard.set(true, forKey: autoKey)
+        }
+        installsAutomatically = controller.updater.automaticallyDownloadsUpdates
         isAvailable = true
         #endif
+    }
+
+    /// Asks macOS whether a system update is waiting. Uses the list macOS
+    /// already downloaded in the background (`--no-scan`), so it's quick.
+    func checkMacOSUpdates() async -> String? {
+        let found = await Task.detached(priority: .utility) { () -> String? in
+            let process = Process()
+            process.executableURL = URL(fileURLWithPath: "/usr/sbin/softwareupdate")
+            process.arguments = ["--list", "--no-scan"]
+            let pipe = Pipe()
+            process.standardOutput = pipe
+            process.standardError = Pipe()
+            guard (try? process.run()) != nil else { return nil }
+            let data = pipe.fileHandleForReading.readDataToEndOfFile()
+            process.waitUntilExit()
+            let output = String(data: data, encoding: .utf8) ?? ""
+            // Lines look like: "* Label: macOS Golden Gate 27.2.2-…"
+            return output.split(separator: "\n")
+                .first { $0.contains("Label:") && ($0.contains("macOS") || $0.contains("Security") || $0.contains("Safari")) }
+                .map { $0.components(separatedBy: "Label:").last?.trimmingCharacters(in: .whitespaces) ?? "" }
+        }.value
+        await MainActor.run { pendingMacOSUpdate = found }
+        return found
+    }
+
+    /// Opens System Settings ▸ General ▸ Software Update.
+    func openSoftwareUpdate() {
+        if let url = URL(string: "x-apple.systempreferences:com.apple.Software-Update-Settings.extension") {
+            NSWorkspace.shared.open(url)
+        }
     }
 
     /// Vela ▸ Check for Updates… Shows a window either way, so you get an answer.

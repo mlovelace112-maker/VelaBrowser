@@ -214,6 +214,11 @@ struct UpdatesSection: View {
             LabeledContent("Version", value: updater.versionDescription)
             if updater.isAvailable {
                 Toggle("Check for updates automatically", isOn: $updater.checksAutomatically)
+                Toggle(isOn: $updater.installsAutomatically) {
+                    Text("Install updates automatically")
+                    Text("Updates, including security fixes, install when you quit Vela.")
+                }
+                .disabled(!updater.checksAutomatically)
                 Toggle(isOn: $updater.getsBetaUpdates) {
                     Text("Get beta updates")
                     Text("Try new features as soon as they're merged. Beta builds are a little less tested.")
@@ -225,7 +230,21 @@ struct UpdatesSection: View {
                             .foregroundStyle(Nightglass.mutedText)
                     }
                 }
-            } else if let reason = updater.unavailableReason {
+            }
+            if let pending = updater.pendingMacOSUpdate {
+                HStack(alignment: .top) {
+                    Image(systemName: "exclamationmark.shield.fill").foregroundStyle(Nightglass.caution)
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("macOS update available")
+                        Text("\(pending). Vela uses Safari's web engine, which only gets security fixes through macOS updates.")
+                            .font(.system(size: 11.5))
+                            .foregroundStyle(Nightglass.mutedText)
+                    }
+                    Spacer()
+                    Button("Open Software Update") { updater.openSoftwareUpdate() }
+                }
+            }
+            if !updater.isAvailable, let reason = updater.unavailableReason {
                 Text(reason)
                     .foregroundStyle(Nightglass.mutedText)
                     .fixedSize(horizontal: false, vertical: true)

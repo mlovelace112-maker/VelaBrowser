@@ -38,7 +38,9 @@ feature branch ─▶ pull request ─▶ merge to main ─▶ beta build ─▶
 1. **Every change starts on its own branch** with a pull request. GitHub's **Build** check compiles Vela on a Mac for every pull request, so build errors show up there. The built app is attached to the run for 7 days if you want to try it early.
 2. **Merging to `main` makes a beta.** The **Release** pipeline builds Vela, signs the update, puts it on the [Releases page](../../releases) as a pre-release, and adds it to the update feed (the `appcast` branch).
 3. **A stable release is one click.** Go to **Actions ▸ Release ▸ Run workflow**, keep channel **stable**, type a version like `1.1`, and run it. Release notes are made from the change list since the last stable version.
-4. **Vela checks once a day** (or Vela ▸ **Check for Updates…**). It shows what's new and installs with one click. Turn on **Get beta updates** in Settings ▸ General to get betas too.
+4. **Vela checks once a day** (or Vela ▸ **Check for Updates…**). By default it downloads updates by itself and installs them when you quit Vela, so security fixes reach you without a click. Turn that off in Settings ▸ General if you'd rather choose. Turn on **Get beta updates** there to get betas too.
+5. **Urgent security fixes:** when running **Release**, tick **Urgent security fix**. Vela then asks everyone to install it right away, even people who skipped an earlier version.
+6. **macOS updates matter too.** Vela draws web pages with WebKit, the same engine as Safari, and Apple fixes WebKit through macOS updates. When one is waiting, Vela tells you at launch, and Settings ▸ General has an **Open Software Update** button.
 
 ### One-time setup
 
@@ -104,6 +106,8 @@ If a step fails, make the same change by hand in the repo's **Settings**: Code s
 | Third-party cookies | Blocked by default, so ad companies can't follow you from site to site. |
 | Allow sign-in | School and work logins (Auth0, Okta, Microsoft, Google and others) keep their cookies automatically. If a site still sends you back to its login page, click the shield and turn on **Allow sign-in** for that site. Ads and trackers stay blocked. |
 | HTTPS upgrade | Insecure `http://` requests are switched to secure `https://`. |
+| **Warn before insecure sites** | If a site has no secure version, Vela stops with a warning page. **Go Back**, or **Continue to Site (Not Secure)** to remember that site. Manage the list in Settings ▸ Privacy. Your own network (router pages, `localhost`) is never warned about. |
+| **Home-network blocking** | Websites can't secretly reach devices on your home network (your router, printer, `localhost`). Pages you open yourself on those addresses still work. |
 | Cookie manager | Open it from the shield panel or press ⌥⌘K. It shows every site's cookies, with trackers listed first. Delete one site, all trackers or everything. Mark a site **Keep** to stay signed in. |
 | Clear cookies on quit | Turn this on in the cookie manager or Settings. When Vela quits, it deletes every site's data except the sites marked Keep. |
 | Settings | Vela ▸ Settings… (⌘,) has every privacy switch, blocked totals, and the sites where the shield is off. |
@@ -129,6 +133,8 @@ If a step fails, make the same change by hand in the repo's **Settings**: Code s
 | **Password store** | Passwords are saved in the macOS Keychain, never in a normal file. Open them with ⌥⌘P or the ••• menu. Touch ID (or your Mac password) unlocks them for 10 minutes. |
 | **Save on sign-in** | After you sign in, Vela asks "Save password?" (or "Update?"). Choose **Never for This Site** to stop asking. Private tabs never save. |
 | **Autofill** | On a page with a login form, a 🔑 key appears in the address bar. Pick an account, confirm with Touch ID, and Vela fills it in. It only ever fills into the exact website the login was saved for. |
+| **Import from the Passwords app** | In the Passwords app choose **File ▸ Export All Passwords…**. Then in Vela's Passwords window click **Import…** and pick the file. Vela saves every login to the Keychain and then shreds the exported file (overwrites it, then deletes it). Exports from Chrome, Firefox, Brave, Edge and 1Password work too. Apple doesn't let browsers other than Safari read the Passwords app directly, so this is the safe way in. |
+| **Password check** | Click **Check** in the Passwords window. Vela lists weak and reused passwords, and (if you leave it on) ones found in data breaches. The breach check uses Have I Been Pwned privately: only the first 5 characters of a scrambled code of each password are sent, never the password. |
 | **Generator** | The Passwords window makes strong random passwords. Copied passwords are hidden from clipboard-history apps and cleared after 90 seconds. |
 | **Passkeys** | Not yet. macOS only lets browsers that Apple has approved use passkeys (an entitlement Apple grants to browser makers). |
 
@@ -141,6 +147,7 @@ If a step fails, make the same change by hand in the repo's **Settings**: Code s
 | **Browser control** | In the panel, Claude can list your tabs, read and summarize a page, open addresses and searches, switch tabs, go back, click links and buttons, group tabs (by site or by topic) and close tabs. Each action shows as a chip in the chat. |
 | **Asks first** | Closing tabs and clicks that would send a form show an **Allow / Don't Allow** card. **Stop** cancels at any point. |
 | **Privacy** | Claude sees a page's text only when it reads that page. Private tabs are never shared. Page text is marked as untrusted, and Claude is told never to follow instructions hidden in it. |
+| **Sign-in pages are off limits** | On any page with a password box, Claude can't read the page or click anything. Log in yourself, then ask again. |
 
 ### Image and video search
 | Feature | How to use it |
@@ -183,7 +190,9 @@ The app also has a custom icon: a "V" drawn as the Vela constellation. Its sourc
 3½. ✅ Security and looks: passwords, link checker, safe downloads, script slider, pop-under and stronger ad blocking, themes.
 4. ✅ Extras: Claude in the address bar and side panel, the Spotify player, image and video search, and animation polish.
 5. ✅ Finishing touches: Reader, live Safari bookmarks, default browser, and a packaged app.
-6. ✅ Update pipeline: compile checks on pull requests, beta and stable releases, and self-updates with Sparkle. **← you are here**
+6. ✅ Update pipeline: compile checks on pull requests, beta and stable releases, and self-updates with Sparkle.
+7. 🔨 Security round: Passwords-app import, password check, warnings for insecure sites, home-network blocking, Claude safety on sign-in pages, automatic and urgent updates, and an OWASP Top 10 review (see SECURITY.md). **← you are here**
+8. Next: fingerprinting protection, per-site permissions, email masking, session restore, tab sleeping, picture-in-picture, and download scanning.
 
 ## How the code is organized
 

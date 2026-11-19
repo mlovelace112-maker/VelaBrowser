@@ -91,6 +91,7 @@ enum BrowserTools {
             let tab = try targetTab(from: input, store)
             let url = try readableURL(of: tab)
             await waitForLoad(tab)
+            try await ensureNotSensitive(tab)
             let result: [String: Any]
             do {
                 result = try await runScript(Scripts.read, in: tab, arguments: ["maxChars": 30_000]) as? [String: Any] ?? [:]
@@ -147,6 +148,7 @@ enum BrowserTools {
             let wanted = try requiredString(input, "text")
             let tab = try targetTab(from: input, store)
             let url = try readableURL(of: tab)
+            try await ensureNotSensitive(tab)
             let preview = try? await runScript(Scripts.click, in: tab, arguments: ["text": wanted, "perform": false]) as? [String: Any]
             guard let preview, preview["found"] as? Bool == true else {
                 throw ToolError("There's no visible link or button labeled “\(wanted)” on this page.")
@@ -282,6 +284,20 @@ enum BrowserTools {
         }
         guard let url = tab.url else { throw ToolError("That tab shows the New Tab page, which has no web page.") }
         return url
+    }
+
+    /// Sign-in pages stay private: if a page shows a password box, Claude
+    /// can't read it or click on it. This protects your login from being
+    /// read, and stops a malicious page from tricking Claude into typing
+    /// or submitting something there.
+    private static func ensureNotSensitive(_ tab: BrowserTab) async throws {
+        let hasPassword = (try? await runScript(
+            "return !!document.querySelector('input[type=\"password\"]');",
+            in: tab, arguments: [:]
+        )) as? Bool ?? true
+        if hasPassword {
+            throw ToolError("This page has a password box, so Vela keeps it private from Claude. The user can sign in themselves, then ask again.")
+        }
     }
 
     /// Waits (up to 10 seconds) for a tab to finish loading.

@@ -25,6 +25,10 @@ on:
       version:
         description: "Version number for a stable release, like 1.1 (leave empty to use the one in Xcode)"
         required: false
+      critical:
+        description: "Urgent security fix: ask everyone to install it right away"
+        type: boolean
+        default: false
 
 concurrency:
   group: release
@@ -188,6 +192,7 @@ jobs:
           BUILD: ${{ steps.v.outputs.build }}
           CHANNEL: ${{ steps.v.outputs.channel }}
           SIGNATURE: ${{ steps.sig.outputs.signature }}
+          CRITICAL: ${{ inputs.critical && 'true' || 'false' }}
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
@@ -205,7 +210,8 @@ jobs:
           python3 scripts/appcast.py --appcast "$FEED/appcast.xml" \
             --version "$VERSION" --build "$BUILD" --channel "$CHANNEL" \
             --url "https://github.com/$GITHUB_REPOSITORY/releases/download/$TAG/Vela-$VERSION.zip" \
-            --signature "$SIGNATURE" --notes build/notes.html
+            --signature "$SIGNATURE" --notes build/notes.html \
+            $([[ "$CRITICAL" == "true" ]] && echo --critical)
           git -C "$FEED" add -A
           git -C "$FEED" commit -qm "Add Vela $VERSION ($CHANNEL)"
           git -C "$FEED" push origin "$FEED_BRANCH"

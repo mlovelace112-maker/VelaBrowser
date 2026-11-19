@@ -106,6 +106,9 @@ private struct PageArea: View {
                     if let warning = tab.linkWarning {
                         LinkWarningView(tab: tab, warning: warning)
                             .transition(.opacity)
+                    } else if let insecure = tab.httpsWarning {
+                        HTTPSWarningView(tab: tab, url: insecure)
+                            .transition(.opacity)
                     }
                 }
             }

@@ -63,6 +63,13 @@ struct PrivacySettings: Codable, Equatable {
     var blockEmbeddedAds = true
     var blockThirdPartyCookies = true
     var upgradeToHTTPS = true
+    /// HTTPS-Only: if a site has no secure version, show a warning first.
+    var httpsOnly = true
+    /// Sites where you chose "Continue to Site (Not Secure)".
+    var httpAllowedSites: Set<String> = []
+    /// Stops websites from reaching devices on your home network (your
+    /// router, printer, smart-home hubs) or apps running on your Mac.
+    var blockLocalNetworkAccess = true
     var clearCookiesOnQuit = false
     /// Sites whose cookies survive "Clear cookies when I quit" (so you stay signed in).
     var keptSites: Set<String> = []
@@ -107,6 +114,8 @@ struct PrivacySettings: Codable, Equatable {
             blockEmbeddedAds: blockEmbeddedAds,
             blockThirdPartyCookies: blockThirdPartyCookies,
             upgradeToHTTPS: upgradeToHTTPS,
+            httpAllowedSites: httpAllowedSites,
+            blockLocalNetworkAccess: blockLocalNetworkAccess,
             shieldsDownSites: shieldsDownSites,
             signInSites: signInSites,
             scriptLevel: scriptLevel,
@@ -140,6 +149,8 @@ struct PrivacySettings: Codable, Equatable {
         let blockEmbeddedAds: Bool
         let blockThirdPartyCookies: Bool
         let upgradeToHTTPS: Bool
+        let httpAllowedSites: Set<String>
+        let blockLocalNetworkAccess: Bool
         let shieldsDownSites: Set<String>
         let signInSites: Set<String>
         let scriptLevel: ScriptLevel
@@ -160,6 +171,9 @@ struct PrivacySettings: Codable, Equatable {
         blockEmbeddedAds = try c.decodeIfPresent(Bool.self, forKey: .blockEmbeddedAds) ?? d.blockEmbeddedAds
         blockThirdPartyCookies = try c.decodeIfPresent(Bool.self, forKey: .blockThirdPartyCookies) ?? d.blockThirdPartyCookies
         upgradeToHTTPS = try c.decodeIfPresent(Bool.self, forKey: .upgradeToHTTPS) ?? d.upgradeToHTTPS
+        httpsOnly = try c.decodeIfPresent(Bool.self, forKey: .httpsOnly) ?? d.httpsOnly
+        httpAllowedSites = try c.decodeIfPresent(Set<String>.self, forKey: .httpAllowedSites) ?? d.httpAllowedSites
+        blockLocalNetworkAccess = try c.decodeIfPresent(Bool.self, forKey: .blockLocalNetworkAccess) ?? d.blockLocalNetworkAccess
         clearCookiesOnQuit = try c.decodeIfPresent(Bool.self, forKey: .clearCookiesOnQuit) ?? d.clearCookiesOnQuit
         keptSites = try c.decodeIfPresent(Set<String>.self, forKey: .keptSites) ?? d.keptSites
         shieldsDownSites = try c.decodeIfPresent(Set<String>.self, forKey: .shieldsDownSites) ?? d.shieldsDownSites
