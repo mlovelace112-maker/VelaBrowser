@@ -149,6 +149,19 @@ struct PageMenu: View {
             Divider()
             Button("Summarize Page with Claude") { store.askClaudeInPanel("Summarize this page.") }
                 .disabled(tab.url == nil || tab.isPrivate)
+            Button(tab.translation == .translated ? "Show Original" : "Translate Page") {
+                if tab.translation == .translated { Task { await tab.showOriginalText() } } else { tab.translateRequests += 1 }
+            }
+            .disabled(tab.pageLanguage == nil)
+            Divider()
+            Button("Add to Reading List") { store.addToReadingList(tab) }
+                .disabled(tab.url == nil || tab.isPrivate || store.isInReadingList(tab.url))
+            Menu("Screenshot") {
+                Button("Full Page as Image") { Task { await store.takeScreenshot(.fullPageImage, of: tab) } }
+                Button("Full Page as PDF") { Task { await store.takeScreenshot(.fullPagePDF, of: tab) } }
+                Button("Visible Area (Copy and Save)") { Task { await store.takeScreenshot(.visibleArea, of: tab) } }
+            }
+            .disabled(tab.url == nil)
             Divider()
             Button("Picture in Picture") { Task { await store.togglePictureInPicture() } }
                 .disabled(tab.url == nil)
@@ -322,6 +335,11 @@ struct AddressBar: View {
                 .popover(isPresented: $tab.isLoginPickerShown, arrowEdge: .bottom) {
                     LoginPicker(tab: tab)
                 }
+            }
+
+            // Translate: only on pages in another language.
+            if tab.pageLanguage != nil, tab.mediaSearch == nil, tab.reader == nil, !isFocused {
+                TranslateButton(tab: tab)
             }
 
             // Reader: show just the article.

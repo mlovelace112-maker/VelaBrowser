@@ -113,6 +113,13 @@ struct BrowserCommands: Commands {
             .keyboardShortcut("r", modifiers: [.command, .shift])
             Button("Picture in Picture") { Task { await store.togglePictureInPicture() } }
                 .keyboardShortcut("v", modifiers: [.command, .option])
+            Button("Translate Page") { store.selectedTab?.translateRequests += 1 }
+                .keyboardShortcut("t", modifiers: [.command, .option])
+                .disabled(store.selectedTab?.pageLanguage == nil)
+            Button("Add to Reading List") { store.addToReadingList() }
+                .keyboardShortcut("d", modifiers: [.command, .shift])
+            Button("Full-Page Screenshot") { Task { await store.takeScreenshot(.fullPageImage) } }
+                .keyboardShortcut("s", modifiers: [.command, .shift])
             Divider()
         }
 
