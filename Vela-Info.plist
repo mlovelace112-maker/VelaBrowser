@@ -24,7 +24,7 @@
 	<key>SUFeedURL</key>
 	<string>https://raw.githubusercontent.com/mlovelace112-maker/VelaBrowser/appcast/appcast.xml</string>
 	<key>SUPublicEDKey</key>
-	<string></string>
+	<string>8a9zmPRkpmBPzpUi6HzNrZgViBCo/EF7q/C3F9FW1Qs=</string>
 	<key>SUEnableAutomaticChecks</key>
 	<true/>
 	<!-- …and web pages saved on your Mac. -->
