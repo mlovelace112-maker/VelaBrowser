@@ -42,7 +42,27 @@ struct ClaudePanel: View {
             store.open(url, inNewTab: true)
             return .handled
         })
-        .onAppear { isInputFocused = true }
+        .onAppear {
+            takePendingDraft()
+            isInputFocused = true
+        }
+        .onChange(of: claude.pendingDraft) { takePendingDraft() }
+        .onChange(of: store.voice.transcript) { _, heard in
+            if store.voice.isListening { draft = heard }
+        }
+        .onChange(of: store.voice.finished) {
+            draft = store.voice.transcript
+            send()
+        }
+        .onDisappear { store.voice.stop(send: false) }
+    }
+
+    /// "Ask Claude About This…" puts the text in the box for you to finish.
+    private func takePendingDraft() {
+        guard let pending = store.claude.pendingDraft else { return }
+        store.claude.pendingDraft = nil
+        draft = pending
+        isInputFocused = true
     }
 
     private func header(_ claude: ClaudeAssistant) -> some View {
@@ -110,6 +130,8 @@ struct ClaudePanel: View {
                 .onSubmit(send)
                 .padding(.vertical, 5)
 
+            MicButton(voice: store.voice)
+
             if claude.isWorking {
                 Button { claude.stop() } label: {
                     Image(systemName: "stop.fill")
@@ -138,7 +160,25 @@ struct ClaudePanel: View {
         .background(shape.fill(Color.black.opacity(0.35)))
         .overlay(shape.strokeBorder(isInputFocused ? Nightglass.claude.opacity(0.6) : Color.white.opacity(0.12)))
         .animation(.easeOut(duration: 0.2), value: isInputFocused)
+        .overlay(alignment: .top) { voiceStatus }
         .padding(12)
+    }
+
+    /// "Listening…" above the box, or why the mic couldn't start.
+    @ViewBuilder private var voiceStatus: some View {
+        let voice = store.voice
+        if voice.isListening || voice.error != nil {
+            Label(voice.error ?? "Listening… pause when you're done",
+                  systemImage: voice.error == nil ? "waveform" : "exclamationmark.triangle")
+                .font(.system(size: 11))
+                .foregroundStyle(voice.error == nil ? Nightglass.claude : Nightglass.caution)
+                .lineLimit(2)
+                .padding(.horizontal, 8)
+                .padding(.vertical, 3)
+                .background(Capsule().fill(Color.black.opacity(0.6)))
+                .offset(y: -26)
+                .transition(.opacity)
+        }
     }
 
     private func send() {
@@ -147,6 +187,31 @@ struct ClaudePanel: View {
         guard !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return }
         draft = ""
         store.claude.send(text)
+    }
+}
+
+/// Talk instead of typing (⌥⌘A).
+private struct MicButton: View {
+    let voice: VoiceInput
+    @State private var pulse = false
+
+    var body: some View {
+        Button { voice.toggle() } label: {
+            Image(systemName: voice.isListening ? "mic.fill" : "mic")
+                .font(.system(size: 13, weight: .semibold))
+                .foregroundStyle(voice.isListening ? Nightglass.claude : Nightglass.secondaryText)
+                .frame(width: 28, height: 28)
+                .background(Circle().fill(Nightglass.claude.opacity(voice.isListening ? (pulse ? 0.28 : 0.12) : 0)))
+        }
+        .buttonStyle(.plain)
+        .help(voice.isListening ? "Stop listening" : "Talk to Claude (⌥⌘A)")
+        .onChange(of: voice.isListening) { _, listening in
+            if listening {
+                withAnimation(.easeInOut(duration: 0.7).repeatForever(autoreverses: true)) { pulse = true }
+            } else {
+                withAnimation(.easeOut(duration: 0.2)) { pulse = false }
+            }
+        }
     }
 }
 

@@ -276,6 +276,7 @@ enum CommandSearch {
             command("New Private Tab", "eyeglasses", "incognito") { store.newTab(isPrivate: true) },
             command("Reopen Closed Tab", "arrow.uturn.backward", "undo close") { store.reopenClosedTab() },
             command("Show Claude", "sparkle", "chat ai assistant") { store.isClaudePanelVisible = true },
+            command("Talk to Claude", "mic", "voice speak dictate") { store.talkToClaude() },
             command("Show History", "clock") { store.showSidebar(.history) },
             command("Weekly Report", "chart.bar", "activity time online stats screen time") { store.isActivityReportVisible = true },
             command("Show Bookmarks", "book") { store.showSidebar(.bookmarks) },

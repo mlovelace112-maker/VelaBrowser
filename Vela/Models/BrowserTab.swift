@@ -139,7 +139,7 @@ final class BrowserTab: Identifiable {
         tabConfiguration.userContentController = contentController
         self.contentController = contentController
 
-        webView = WKWebView(frame: .zero, configuration: tabConfiguration)
+        webView = VelaWebView(frame: .zero, configuration: tabConfiguration)
         webView.allowsBackForwardNavigationGestures = true
         webView.allowsMagnification = true
         self.isPrivate = isPrivate
@@ -176,7 +176,7 @@ final class BrowserTab: Identifiable {
     /// blocking rules, scripts and message mailboxes instead of making its own.
     init(popupConfiguration: WKWebViewConfiguration, isPrivate: Bool, url: URL?) {
         contentController = popupConfiguration.userContentController
-        webView = WKWebView(frame: .zero, configuration: popupConfiguration)
+        webView = VelaWebView(frame: .zero, configuration: popupConfiguration)
         webView.allowsBackForwardNavigationGestures = true
         webView.allowsMagnification = true
         self.isPrivate = isPrivate
