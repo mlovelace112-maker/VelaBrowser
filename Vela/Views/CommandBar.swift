@@ -219,6 +219,13 @@ enum CommandSearch {
         results.append(CommandItem(id: "claude", kind: .claude, icon: "sparkle", title: "Ask Claude: “\(query)”") {
             store.claude.ask(query, about: store.selectedTab)
         })
+        if store.pageMemory.isEnabled, !store.pageMemory.pages.isEmpty {
+            results.append(CommandItem(id: "finder", kind: .claude, icon: "clock.arrow.circlepath",
+                                       title: "Find a page I've seen: “\(query)”") {
+                store.pageFinderQuestion = query
+                store.isPageFinderVisible = true
+            })
+        }
         results.append(CommandItem(id: "web", kind: .web, icon: "magnifyingglass", title: "Search the web for “\(query)”") {
             store.navigateInUsefulTab(query)
         })
@@ -270,6 +277,7 @@ enum CommandSearch {
             command("Reopen Closed Tab", "arrow.uturn.backward", "undo close") { store.reopenClosedTab() },
             command("Show Claude", "sparkle", "chat ai assistant") { store.isClaudePanelVisible = true },
             command("Show History", "clock") { store.showSidebar(.history) },
+            command("Weekly Report", "chart.bar", "activity time online stats screen time") { store.isActivityReportVisible = true },
             command("Show Bookmarks", "book") { store.showSidebar(.bookmarks) },
             command("Show Reading List", "eyeglasses", "read later") { store.showSidebar(.readingList) },
             command(store.isSidebarVisible ? "Hide Sidebar" : "Show Sidebar", "sidebar.left") { store.isSidebarVisible.toggle() },

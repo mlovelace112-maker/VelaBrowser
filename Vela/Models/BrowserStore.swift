@@ -94,6 +94,15 @@ final class BrowserStore {
     /// Tabs Vela tidied away, newest first.
     var archivedTabs: [ArchivedTab] = BrowserStore.loadArchivedTabs()
 
+    // Weekly activity and privacy report (ActivityLog.swift)
+    let activity = ActivityLog()
+    var isActivityReportVisible = false
+    /// "What was that page?" (PageMemory.swift)
+    let pageMemory = PageMemory()
+    var isPageFinderVisible = false
+    /// A question to start the page finder with (from the command bar).
+    var pageFinderQuestion = ""
+
     // Command bar (⌘K) and link previews (hold ⌥ over a link)
     var isCommandBarVisible = false
     var linkPreview: LinkPreview?
@@ -174,6 +183,7 @@ final class BrowserStore {
             selectedTab?.wake()
         }
         startTabSleepTimer()
+        startActivityClock()
     }
 
     /// Safer WebKit settings for every tab.
@@ -267,6 +277,7 @@ final class BrowserStore {
         tab.onFinishLoading = { [weak self, weak tab] in
             guard let self, let tab else { return }
             self.recordVisit(tab)
+            self.rememberPage(in: tab)
             Task { await tab.detectLanguage() }
             if tab.pendingCode != nil { Task { await self.fillPendingCode(in: tab) } }
         }
@@ -837,6 +848,9 @@ final class BrowserStore {
                 await self.sleepIdleTabs()
                 self.archiveIdleTabs()
                 self.checkFocus()
+                self.activity.save()
+                self.pageMemory.save()
+                self.announceWeeklyReportIfDue()
                 self.saveSession()
             }
         }
@@ -954,6 +968,7 @@ final class BrowserStore {
               !tab.trackersFound.contains(domain) else { return }
         tab.trackersFound.append(domain)
         trackersBlockedTotal += 1
+        if !tab.isPrivate { activity.recordTrackerBlocked() }
         UserDefaults.standard.set(trackersBlockedTotal, forKey: "vela.trackersBlockedTotal")
     }
 
@@ -961,6 +976,7 @@ final class BrowserStore {
         guard isPopUnder ? privacy.popUnderProtection : privacy.blockPopups else { return }
         if let url { tab.popupsBlocked.append(url) }
         popupsBlockedTotal += 1
+        if !tab.isPrivate { activity.recordPopupBlocked() }
         UserDefaults.standard.set(popupsBlockedTotal, forKey: "vela.popupsBlockedTotal")
 
         let popup = BlockedPopup(tabID: tab.id, url: url, isPopUnder: isPopUnder)
@@ -1159,6 +1175,7 @@ final class BrowserStore {
             history[0].date = Date()
         } else {
             history.insert(HistoryEntry(title: tab.title, url: url, date: Date()), at: 0)
+            activity.recordPage(url)
             if history.count > Self.historyLimit { history.removeLast(history.count - Self.historyLimit) }
         }
         saveHistory()

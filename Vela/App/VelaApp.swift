@@ -136,6 +136,10 @@ struct BrowserCommands: Commands {
             Divider()
             Button("Show All History") { store.showSidebar(.history) }
                 .keyboardShortcut("y")
+            Button("Find a Page I've Seen…") { store.isPageFinderVisible = true }
+                .keyboardShortcut("y", modifiers: [.command, .option])
+            Button("Weekly Report") { store.isActivityReportVisible = true }
+                .keyboardShortcut("r", modifiers: [.command, .option])
             Button("Clear History") { store.clearHistory() }
         }
 
