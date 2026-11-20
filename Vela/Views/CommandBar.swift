@@ -277,6 +277,8 @@ enum CommandSearch {
             command("Reopen Closed Tab", "arrow.uturn.backward", "undo close") { store.reopenClosedTab() },
             command("Show Claude", "sparkle", "chat ai assistant") { store.isClaudePanelVisible = true },
             command("Talk to Claude", "mic", "voice speak dictate") { store.talkToClaude() },
+            command("Compare Tabs", "tablecells", "claude side by side versus products") { store.showCompareTabs() },
+            command("Organize Bookmarks with Claude", "folder", "sort folders tags smart") { store.organizeBookmarks() },
             command("Show History", "clock") { store.showSidebar(.history) },
             command("Weekly Report", "chart.bar", "activity time online stats screen time") { store.isActivityReportVisible = true },
             command("Show Bookmarks", "book") { store.showSidebar(.bookmarks) },
@@ -313,6 +315,9 @@ enum CommandSearch {
                 store.showNotice("Archived tabs are in the Tabs menu, or type their name here")
             })
         }
+        if let tab, BrowserStore.isYouTubeVideo(tab.url) {
+            list.append(command("Summarize This Video", "play.rectangle", "claude youtube transcript") { store.summarizeVideo(in: tab) })
+        }
         if let tab, tab.url != nil {
             list += [
                 command("Close Tab", "xmark") { store.close(tab) },
@@ -324,6 +329,7 @@ enum CommandSearch {
                 command("Copy Link", "link", "address url") { store.copyLink(of: tab) },
                 command("Find on Page", "magnifyingglass", "search") { store.showFindBar() },
                 command("Reload Page", "arrow.clockwise", "refresh") { tab.webView.reload() },
+                command("Is This Site Legit?", "checkmark.shield", "claude scam fraud safe trust check") { store.checkSite(in: tab) },
                 command(tab.reader == nil ? "Show Reader" : "Hide Reader", "doc.plaintext", "article") {
                     Task { await store.toggleReader(for: tab) }
                 },

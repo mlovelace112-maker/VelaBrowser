@@ -335,5 +335,10 @@ struct ExtraSheets: View {
                     PageFinderView().environment(store)
                 }
             }
+            .background {
+                Color.clear.sheet(item: $store.pageTool) { tool in
+                    PageToolSheet(initial: tool).environment(store)
+                }
+            }
     }
 }
