@@ -100,6 +100,11 @@ final class BrowserStore {
     /// "What was that page?" (PageMemory.swift)
     let pageMemory = PageMemory()
     var isPageFinderVisible = false
+    /// Highlights and notes you made on pages (Highlights.swift)
+    let highlights = HighlightStore()
+    var isHighlightsVisible = false
+    /// The highlight whose note is being written (Highlight with Note…).
+    var editingHighlightID: UUID?
     /// The Claude tools sheet: compare tabs, video summary, site check.
     var pageTool: PageToolState?
     /// True while Claude sorts your bookmarks into folders.
@@ -284,11 +289,15 @@ final class BrowserStore {
             guard let self, let tab else { return }
             self.recordVisit(tab)
             self.rememberPage(in: tab)
+            self.restoreHighlights(in: tab)
             Task { await tab.detectLanguage() }
             if tab.pendingCode != nil { Task { await self.fillPendingCode(in: tab) } }
         }
         (tab.webView as? VelaWebView)?.onTextAction = { [weak self, weak tab] action in
             if let tab { self?.perform(action, in: tab) }
+        }
+        (tab.webView as? VelaWebView)?.onHighlight = { [weak self, weak tab] withNote in
+            if let tab { self?.highlightSelection(in: tab, withNote: withNote) }
         }
         tab.onTrackerFound = { [weak self, weak tab] domain in
             if let tab { self?.recordTracker(domain, in: tab) }

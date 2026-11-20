@@ -340,5 +340,18 @@ struct ExtraSheets: View {
                     PageToolSheet(initial: tool).environment(store)
                 }
             }
+            .background {
+                Color.clear.sheet(isPresented: $store.isHighlightsVisible) {
+                    HighlightsView().environment(store)
+                }
+            }
+            .background {
+                Color.clear.sheet(item: Binding(
+                    get: { store.editingHighlightID.map(EditingHighlight.init) },
+                    set: { store.editingHighlightID = $0?.id }
+                )) { editing in
+                    HighlightNoteSheet(id: editing.id).environment(store)
+                }
+            }
     }
 }

@@ -283,6 +283,10 @@ enum CommandSearch {
             command("Weekly Report", "chart.bar", "activity time online stats screen time") { store.isActivityReportVisible = true },
             command("Show Bookmarks", "book") { store.showSidebar(.bookmarks) },
             command("Show Reading List", "eyeglasses", "read later") { store.showSidebar(.readingList) },
+            command("Highlights & Notes", "highlighter", "annotations marked passages") { store.isHighlightsVisible = true },
+            command("Keyboard Shortcuts", "keyboard", "keys customize hotkeys") {
+                NSApp.sendAction(Selector(("showSettingsWindow:")), to: nil, from: nil)
+            },
             command(store.isSidebarVisible ? "Hide Sidebar" : "Show Sidebar", "sidebar.left") { store.isSidebarVisible.toggle() },
             command("Group Similar Tabs", "square.stack.3d.up", "organize") { store.groupSimilarTabs() },
             command(store.verticalTabs ? "Horizontal Tabs" : "Vertical Tabs", "sidebar.squares.left", "layout") { store.verticalTabs.toggle() },

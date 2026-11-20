@@ -41,20 +41,20 @@ struct BrowserCommands: Commands {
         // File menu
         CommandGroup(replacing: .newItem) {
             Button("New Tab") { store.newTab() }
-                .keyboardShortcut("t")
+                .velaShortcut("New Tab", "t")
             Button("New Private Tab") { store.newTab(isPrivate: true) }
-                .keyboardShortcut("n", modifiers: [.command, .shift])
+                .velaShortcut("New Private Tab", "n", modifiers: [.command, .shift])
             Button("Reopen Closed Tab") { store.reopenClosedTab() }
-                .keyboardShortcut("t", modifiers: [.command, .shift])
+                .velaShortcut("Reopen Closed Tab", "t", modifiers: [.command, .shift])
             Button("Close Tab") {
                 if let tab = store.selectedTab { store.close(tab) }
             }
-            .keyboardShortcut("w", modifiers: [.command, .shift])
+            .velaShortcut("Close Tab", "w", modifiers: [.command, .shift])
             Divider()
             Button("Open Location…") { store.addressBarFocusRequest += 1 }
-                .keyboardShortcut("l")
+                .velaShortcut("Open Location", "l")
             Button("Command Bar…") { store.isCommandBarVisible.toggle() }
-                .keyboardShortcut("k")
+                .velaShortcut("Command Bar", "k")
         }
 
         // Vela menu
@@ -73,17 +73,17 @@ struct BrowserCommands: Commands {
         CommandGroup(after: .newItem) {
             Divider()
             Button("Manage Cookies and Site Data…") { store.isCookieManagerVisible = true }
-                .keyboardShortcut("k", modifiers: [.command, .option])
+                .velaShortcut("Manage Cookies and Site Data", "k", modifiers: [.command, .option])
             Button("Passwords…") { store.isPasswordsVisible = true }
-                .keyboardShortcut("p", modifiers: [.command, .option])
+                .velaShortcut("Passwords", "p", modifiers: [.command, .option])
         }
 
         // Edit menu: Find
         CommandGroup(after: .textEditing) {
             Button("Find on Page…") { store.showFindBar() }
-                .keyboardShortcut("f")
+                .velaShortcut("Find on Page", "f")
             Button("Fill Private Email Address") { Task { await store.fillPrivateEmail() } }
-                .keyboardShortcut("e", modifiers: [.command, .option])
+                .velaShortcut("Fill Private Email Address", "e", modifiers: [.command, .option])
         }
 
         // View menu: sidebar and zoom
@@ -91,39 +91,39 @@ struct BrowserCommands: Commands {
             Button(store.isSidebarVisible ? "Hide Sidebar" : "Show Sidebar") {
                 store.isSidebarVisible.toggle()
             }
-            .keyboardShortcut("l", modifiers: [.command, .shift])
+            .velaShortcut("Sidebar", "l", modifiers: [.command, .shift])
             Button(store.isClaudePanelVisible ? "Hide Claude" : "Show Claude") {
                 store.isClaudePanelVisible.toggle()
             }
-            .keyboardShortcut("a", modifiers: [.command, .shift])
+            .velaShortcut("Claude Panel", "a", modifiers: [.command, .shift])
             Button(store.voice.isListening ? "Stop Listening" : "Talk to Claude") { store.talkToClaude() }
-                .keyboardShortcut("a", modifiers: [.command, .option])
+                .velaShortcut("Talk to Claude", "a", modifiers: [.command, .option])
             Button(store.spotify.isBarVisible ? "Hide Spotify Player" : "Show Spotify Player") {
                 store.spotify.isBarVisible.toggle()
             }
-            .keyboardShortcut("s", modifiers: [.command, .option])
+            .velaShortcut("Spotify Player", "s", modifiers: [.command, .option])
             Divider()
             Button("Zoom In") { store.selectedTab?.zoomIn() }
-                .keyboardShortcut("=")
+                .velaShortcut("Zoom In", "=")
             Button("Zoom Out") { store.selectedTab?.zoomOut() }
-                .keyboardShortcut("-")
+                .velaShortcut("Zoom Out", "-")
             Button("Actual Size") { store.selectedTab?.resetZoom() }
-                .keyboardShortcut("0")
+                .velaShortcut("Actual Size", "0")
             Button("Reload Page") { store.selectedTab?.webView.reload() }
-                .keyboardShortcut("r")
+                .velaShortcut("Reload Page", "r")
             Button(store.selectedTab?.reader == nil ? "Show Reader" : "Hide Reader") {
                 Task { await store.toggleReader() }
             }
-            .keyboardShortcut("r", modifiers: [.command, .shift])
+            .velaShortcut("Reader", "r", modifiers: [.command, .shift])
             Button("Picture in Picture") { Task { await store.togglePictureInPicture() } }
-                .keyboardShortcut("v", modifiers: [.command, .option])
+                .velaShortcut("Picture in Picture", "v", modifiers: [.command, .option])
             Button("Translate Page") { store.selectedTab?.translateRequests += 1 }
-                .keyboardShortcut("t", modifiers: [.command, .option])
+                .velaShortcut("Translate Page", "t", modifiers: [.command, .option])
                 .disabled(store.selectedTab?.pageLanguage == nil)
             Button("Add to Reading List") { store.addToReadingList() }
-                .keyboardShortcut("d", modifiers: [.command, .shift])
+                .velaShortcut("Add to Reading List", "d", modifiers: [.command, .shift])
             Button("Full-Page Screenshot") { Task { await store.takeScreenshot(.fullPageImage) } }
-                .keyboardShortcut("s", modifiers: [.command, .shift])
+                .velaShortcut("Full-Page Screenshot", "s", modifiers: [.command, .shift])
             VideoMenu(store: store)
             SiteToolsMenu(store: store)
             Divider()
@@ -132,28 +132,31 @@ struct BrowserCommands: Commands {
         // History menu
         CommandMenu("History") {
             Button("Back") { store.selectedTab?.webView.goBack() }
-                .keyboardShortcut("[")
+                .velaShortcut("Back", "[")
             Button("Forward") { store.selectedTab?.webView.goForward() }
-                .keyboardShortcut("]")
+                .velaShortcut("Forward", "]")
             Divider()
             Button("Show All History") { store.showSidebar(.history) }
-                .keyboardShortcut("y")
+                .velaShortcut("Show All History", "y")
             Button("Find a Page I've Seen…") { store.isPageFinderVisible = true }
-                .keyboardShortcut("y", modifiers: [.command, .option])
+                .velaShortcut("Find a Page I've Seen", "y", modifiers: [.command, .option])
             Button("Weekly Report") { store.isActivityReportVisible = true }
-                .keyboardShortcut("r", modifiers: [.command, .option])
+                .velaShortcut("Weekly Report", "r", modifiers: [.command, .option])
             Button("Clear History") { store.clearHistory() }
         }
 
         // Bookmarks menu
         CommandMenu("Bookmarks") {
             Button("Show Bookmarks") { store.showSidebar(.bookmarks) }
-                .keyboardShortcut("b", modifiers: [.command, .option])
+                .velaShortcut("Show Bookmarks", "b", modifiers: [.command, .option])
             Button("Add Bookmark") {
                 if let tab = store.selectedTab { store.toggleBookmark(for: tab) }
             }
-            .keyboardShortcut("d")
+            .velaShortcut("Add Bookmark", "d")
             Button("Bookmark All Tabs") { store.addBookmarksForAllTabs() }
+            Divider()
+            Button("Highlights & Notes") { store.isHighlightsVisible = true }
+                .velaShortcut("Highlights & Notes", "h", modifiers: [.command, .shift])
         }
 
         // Claude menu: tools that read whole pages
@@ -164,12 +167,12 @@ struct BrowserCommands: Commands {
         // Tabs menu
         CommandMenu("Tabs") {
             Button("Show Next Tab") { store.selectAdjacentTab(forward: true) }
-                .keyboardShortcut("]", modifiers: [.command, .shift])
+                .velaShortcut("Show Next Tab", "]", modifiers: [.command, .shift])
             Button("Show Previous Tab") { store.selectAdjacentTab(forward: false) }
-                .keyboardShortcut("[", modifiers: [.command, .shift])
+                .velaShortcut("Show Previous Tab", "[", modifiers: [.command, .shift])
             Divider()
             Button("Group Similar Tabs") { store.groupSimilarTabs() }
-                .keyboardShortcut("g", modifiers: [.command, .shift])
+                .velaShortcut("Group Similar Tabs", "g", modifiers: [.command, .shift])
             Button("Pin Tab") {
                 if let tab = store.selectedTab { store.togglePin(tab) }
             }
@@ -180,9 +183,9 @@ struct BrowserCommands: Commands {
             Button(store.splitPair == nil ? "Split View with New Tab" : "Close Split View") {
                 if store.splitPair == nil { store.openSplitViewWithNewTab() } else { store.closeSplitView() }
             }
-            .keyboardShortcut("d", modifiers: [.command, .option])
+            .velaShortcut("Split View", "d", modifiers: [.command, .option])
             Toggle("Vertical Tabs", isOn: Binding(get: { store.verticalTabs }, set: { store.verticalTabs = $0 }))
-                .keyboardShortcut("v", modifiers: [.command, .control])
+                .velaShortcut("Vertical Tabs", "v", modifiers: [.command, .control])
             Menu("New Tab in Container") {
                 ForEach(store.containers) { container in
                     Button(container.name) { store.newTab(container: container.id) }
@@ -218,19 +221,19 @@ struct VideoMenu: View {
     var body: some View {
         Menu("Video") {
             Button("Faster") { store.changeVideoSpeed(faster: true) }
-                .keyboardShortcut(".", modifiers: [.command, .control])
+                .velaShortcut("Faster", ".", modifiers: [.command, .control])
             Button("Slower") { store.changeVideoSpeed(faster: false) }
-                .keyboardShortcut(",", modifiers: [.command, .control])
+                .velaShortcut("Slower", ",", modifiers: [.command, .control])
             Button("Normal Speed") { store.setVideoSpeed(1) }
-                .keyboardShortcut("0", modifiers: [.command, .control])
+                .velaShortcut("Normal Speed", "0", modifiers: [.command, .control])
             Divider()
             Button("Skip Forward 10 Seconds") { store.selectedTab?.skipMedia(by: 10) }
-                .keyboardShortcut(.rightArrow, modifiers: [.command, .control])
+                .velaShortcut("Skip Forward 10 Seconds", .rightArrow, modifiers: [.command, .control])
             Button("Skip Back 10 Seconds") { store.selectedTab?.skipMedia(by: -10) }
-                .keyboardShortcut(.leftArrow, modifiers: [.command, .control])
+                .velaShortcut("Skip Back 10 Seconds", .leftArrow, modifiers: [.command, .control])
             Divider()
             Button(store.selectedTab?.isMuted == true ? "Unmute Tab" : "Mute Tab") { store.selectedTab?.toggleMute() }
-                .keyboardShortcut("m", modifiers: [.command, .control])
+                .velaShortcut("Mute Tab", "m", modifiers: [.command, .control])
         }
         .disabled(store.selectedTab?.url == nil)
     }
@@ -247,7 +250,7 @@ struct SiteToolsMenu: View {
         ))
         .disabled(!store.darkModeEverywhere || store.selectedTab?.url == nil)
         Button(store.isWebPanelVisible ? "Hide Web Panels" : "Show Web Panels") { store.toggleWebPanels() }
-            .keyboardShortcut("p", modifiers: [.command, .control])
+            .velaShortcut("Web Panels", "p", modifiers: [.command, .control])
         Menu("Focus") {
             if store.isFocusActive {
                 Button("Turn Off Focus Mode") { store.stopFocus() }
