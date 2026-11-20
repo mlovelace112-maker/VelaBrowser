@@ -4,6 +4,16 @@
     <title>Vela</title>
     <description>Updates for the Vela browser</description>
     <item>
+      <title>Vela 1.0-beta.23</title>
+      <pubDate>Fri, 20 Nov 2026 06:34:57 GMT</pubDate>
+      <sparkle:version>23</sparkle:version>
+      <sparkle:shortVersionString>1.0-beta.23</sparkle:shortVersionString>
+      <sparkle:minimumSystemVersion>15.0</sparkle:minimumSystemVersion>
+      <sparkle:channel>beta</sparkle:channel>
+      <description>&lt;p&gt;A beta build with the newest changes.&lt;/p&gt;&lt;ul&gt;&lt;li&gt;Fix build: escape the backslash in the transcript script&lt;/li&gt;&lt;li&gt;Fix Organize with Claude and harden the page tools&lt;/li&gt;&lt;/ul&gt;</description>
+      <enclosure url="https://github.com/mlovelace112-maker/VelaBrowser/releases/download/v1.0-beta.23/Vela-1.0-beta.23.zip" sparkle:edSignature="YK9Mbq5aZNBzwlvrdiGDiCThj+3IBpNs+JrHT5yjQDJPSDg1ufFUPLxoz9dKd5iHrXOaD3kaUQsHMaOcCRc+Cg==" length="8431950" type="application/octet-stream" />
+    </item>
+    <item>
       <title>Vela 1.0-beta.22</title>
       <pubDate>Fri, 20 Nov 2026 05:39:25 GMT</pubDate>
       <sparkle:version>22</sparkle:version>
