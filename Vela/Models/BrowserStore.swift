@@ -136,6 +136,8 @@ final class BrowserStore {
 
     // Claude
     let claude = ClaudeAssistant()
+    /// Talk to Claude (⌥⌘A).
+    let voice = VoiceInput()
     var isClaudePanelVisible = false
 
     // Spotify
@@ -280,6 +282,9 @@ final class BrowserStore {
             self.rememberPage(in: tab)
             Task { await tab.detectLanguage() }
             if tab.pendingCode != nil { Task { await self.fillPendingCode(in: tab) } }
+        }
+        (tab.webView as? VelaWebView)?.onTextAction = { [weak self, weak tab] action in
+            if let tab { self?.perform(action, in: tab) }
         }
         tab.onTrackerFound = { [weak self, weak tab] domain in
             if let tab { self?.recordTracker(domain, in: tab) }

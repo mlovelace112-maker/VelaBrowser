@@ -96,6 +96,8 @@ struct BrowserCommands: Commands {
                 store.isClaudePanelVisible.toggle()
             }
             .keyboardShortcut("a", modifiers: [.command, .shift])
+            Button(store.voice.isListening ? "Stop Listening" : "Talk to Claude") { store.talkToClaude() }
+                .keyboardShortcut("a", modifiers: [.command, .option])
             Button(store.spotify.isBarVisible ? "Hide Spotify Player" : "Show Spotify Player") {
                 store.spotify.isBarVisible.toggle()
             }

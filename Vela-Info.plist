@@ -22,7 +22,10 @@
 	<key>NSCameraUsageDescription</key>
 	<string>Websites you allow, like video calls, can use your camera.</string>
 	<key>NSMicrophoneUsageDescription</key>
-	<string>Websites you allow, like video calls, can use your microphone.</string>
+	<string>Websites you allow, like video calls, can use your microphone. Vela also listens when you talk to Claude.</string>
+	<!-- Talk to Claude: speech is turned into text on your Mac. -->
+	<key>NSSpeechRecognitionUsageDescription</key>
+	<string>When you talk to Claude, your Mac turns your speech into text.</string>
 	<!-- Updates (Sparkle). The feed lists every version GitHub has built.
 	     SUPublicEDKey is the public half of the update key made by
 	     scripts/setup-updates.sh; Vela uses it to check that each download really came from your pipeline. -->

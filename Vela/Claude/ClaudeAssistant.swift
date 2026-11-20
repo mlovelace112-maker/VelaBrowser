@@ -56,6 +56,8 @@ final class ClaudeAssistant {
     /// A question waiting for Allow / Don't Allow.
     private(set) var confirmation: ClaudeConfirmation?
     private(set) var quickAnswer: QuickAnswer?
+    /// Text to put in the panel's box for you to finish (from the right-click menu).
+    var pendingDraft: String?
 
     @ObservationIgnored weak var store: BrowserStore?
     /// The conversation in the API's own format, sent with every request.
