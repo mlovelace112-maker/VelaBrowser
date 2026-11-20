@@ -4,6 +4,16 @@
     <title>Vela</title>
     <description>Updates for the Vela browser</description>
     <item>
+      <title>Vela 1.0-beta.22</title>
+      <pubDate>Fri, 20 Nov 2026 05:39:25 GMT</pubDate>
+      <sparkle:version>22</sparkle:version>
+      <sparkle:shortVersionString>1.0-beta.22</sparkle:shortVersionString>
+      <sparkle:minimumSystemVersion>15.0</sparkle:minimumSystemVersion>
+      <sparkle:channel>beta</sparkle:channel>
+      <description>&lt;p&gt;A beta build with the newest changes.&lt;/p&gt;&lt;ul&gt;&lt;li&gt;Fix build: rename PageTools.swift, which clashed with an existing file name&lt;/li&gt;&lt;li&gt;Add compare tabs, YouTube summaries, site check and smart bookmarks&lt;/li&gt;&lt;/ul&gt;</description>
+      <enclosure url="https://github.com/mlovelace112-maker/VelaBrowser/releases/download/v1.0-beta.22/Vela-1.0-beta.22.zip" sparkle:edSignature="jjob18t6hfK/sKuWp/oSseDuhOGKw/eyQrrh+gseq5DNOv2EgcIB8qI+bZ9mENJoHE/CSxuCzg77d0GolWqVDg==" length="8420544" type="application/octet-stream" />
+    </item>
+    <item>
       <title>Vela 1.0-beta.21</title>
       <pubDate>Fri, 20 Nov 2026 05:31:45 GMT</pubDate>
       <sparkle:version>21</sparkle:version>
