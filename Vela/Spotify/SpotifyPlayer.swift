@@ -409,7 +409,7 @@ final class SpotifyPlayer {
         guard engineView == nil else { return }
         let configuration = WKWebViewConfiguration()
         configuration.mediaTypesRequiringUserActionForPlayback = []
-        configuration.applicationNameForUserAgent = "Version/18.0 Safari/605.1.15"
+        configuration.applicationNameForUserAgent = SafariIdentity.applicationName
         let bridge = SpotifyBridge { [weak self] message in self?.handleEngineMessage(message) }
         configuration.userContentController.add(bridge, name: "velaSpotify")
         let webView = WKWebView(frame: CGRect(x: 0, y: 0, width: 2, height: 2), configuration: configuration)

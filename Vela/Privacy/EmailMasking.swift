@@ -111,7 +111,7 @@ final class EmailMasking {
 
     /// DuckDuckGo turns away requests that don't look like they come from a
     /// browser, so Vela identifies as Safari (which it is underneath).
-    private static let userAgent = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Safari/605.1.15"
+    private static var userAgent: String { SafariIdentity.desktop }
 
     private func request(_ path: String, method: String = "GET", query: [String: String] = [:], token: String? = nil, step: String) async throws -> [String: Any] {
         guard var components = URLComponents(string: "\(base)/\(path)") else { throw MaskingError("Bad address.") }

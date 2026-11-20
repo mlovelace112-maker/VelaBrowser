@@ -196,7 +196,7 @@ final class BrowserStore {
         // private tabs never do.
         config.webExtensionController = extensions.controller
         // Identify as Safari so websites serve their normal desktop pages.
-        config.applicationNameForUserAgent = "Version/18.0 Safari/605.1.15"
+        config.applicationNameForUserAgent = SafariIdentity.applicationName
         Self.harden(config)
         configuration = config
 
