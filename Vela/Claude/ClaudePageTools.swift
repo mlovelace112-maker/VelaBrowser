@@ -316,7 +316,7 @@ extension BrowserStore {
       }
       for (const segment of segments()) {
         const stamp = (segment.querySelector('.segment-timestamp')?.textContent || '').trim();
-        const text = (segment.querySelector('.segment-text')?.textContent || '').replace(/\s+/g, ' ').trim();
+        const text = (segment.querySelector('.segment-text')?.textContent || '').replace(/\\s+/g, ' ').trim();
         if (!text) continue;
         const seconds = stamp.split(':').reduce((total, part) => total * 60 + (parseInt(part, 10) || 0), 0);
         lines.push('[' + seconds + '] ' + text);
