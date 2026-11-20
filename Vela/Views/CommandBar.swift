@@ -278,6 +278,8 @@ enum CommandSearch {
             command("Show Claude", "sparkle", "chat ai assistant") { store.isClaudePanelVisible = true },
             command("Talk to Claude", "mic", "voice speak dictate") { store.talkToClaude() },
             command("Compare Tabs", "tablecells", "claude side by side versus products") { store.showCompareTabs() },
+            command("Watched Pages", "eye", "watch monitor price changes alert") { store.isWatchSheetVisible = true },
+            command("Save Tabs as Workspace", "square.stack", "session save set") { store.isWorkspaceSheetVisible = true },
             command("Organize Bookmarks with Claude", "folder", "sort folders tags smart") { store.organizeBookmarks() },
             command("Show History", "clock") { store.showSidebar(.history) },
             command("Weekly Report", "chart.bar", "activity time online stats screen time") { store.isActivityReportVisible = true },
@@ -329,6 +331,7 @@ enum CommandSearch {
                 command("Copy Link", "link", "address url") { store.copyLink(of: tab) },
                 command("Find on Page", "magnifyingglass", "search") { store.showFindBar() },
                 command("Reload Page", "arrow.clockwise", "refresh") { tab.webView.reload() },
+                command(store.readAloudPlayer.state == .idle ? "Read Aloud" : "Stop Reading Aloud", "speaker.wave.2", "speak voice listen tts") { store.readAloud() },
                 command("Is This Site Legit?", "checkmark.shield", "claude scam fraud safe trust check") { store.checkSite(in: tab) },
                 command(tab.reader == nil ? "Show Reader" : "Hide Reader", "doc.plaintext", "article") {
                     Task { await store.toggleReader(for: tab) }

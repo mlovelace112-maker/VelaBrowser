@@ -340,5 +340,15 @@ struct ExtraSheets: View {
                     PageToolSheet(initial: tool).environment(store)
                 }
             }
+            .background {
+                Color.clear.sheet(isPresented: $store.isWatchSheetVisible) {
+                    WatchPagesSheet().environment(store)
+                }
+            }
+            .background {
+                Color.clear.sheet(isPresented: $store.isWorkspaceSheetVisible) {
+                    SaveWorkspaceSheet().environment(store)
+                }
+            }
     }
 }

@@ -124,6 +124,8 @@ struct BrowserCommands: Commands {
                 .keyboardShortcut("d", modifiers: [.command, .shift])
             Button("Full-Page Screenshot") { Task { await store.takeScreenshot(.fullPageImage) } }
                 .keyboardShortcut("s", modifiers: [.command, .shift])
+            Button(store.readAloudPlayer.state == .idle ? "Read Aloud" : "Stop Reading Aloud") { store.readAloud() }
+                .disabled(store.selectedTab?.url == nil)
             VideoMenu(store: store)
             SiteToolsMenu(store: store)
             Divider()
@@ -206,6 +208,9 @@ struct BrowserCommands: Commands {
             }
             .disabled(store.selectedTab?.url == nil || store.selectedTab?.isPrivate == true)
             Button("Put Other Tabs to Sleep") { store.sleepOtherTabs() }
+            Divider()
+            WorkspacesMenu(store: store)
+            Divider()
             Button("Site Settings…") { store.isSiteSettingsVisible = true }
         }
     }

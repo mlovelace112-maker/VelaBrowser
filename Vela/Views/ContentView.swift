@@ -185,6 +185,14 @@ private struct PageArea: View {
             }
         }
         .animation(.easeOut(duration: 0.12), value: store.selectedTab?.hoveredLink)
+        .overlay(alignment: .bottom) {
+            if store.readAloudPlayer.state != .idle {
+                ReadAloudBar()
+                    .padding(.bottom, 16)
+                    .transition(.move(edge: .bottom).combined(with: .opacity))
+            }
+        }
+        .animation(Nightglass.spring, value: store.readAloudPlayer.state)
         .overlay(alignment: .topTrailing) {
             if let prompt = store.passwordPrompt, prompt.tabID == store.selectedTabID {
                 PasswordSaveBanner(prompt: prompt)
