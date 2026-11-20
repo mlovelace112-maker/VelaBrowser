@@ -53,6 +53,8 @@ struct BrowserCommands: Commands {
             Divider()
             Button("Open Location…") { store.addressBarFocusRequest += 1 }
                 .keyboardShortcut("l")
+            Button("Command Bar…") { store.isCommandBarVisible.toggle() }
+                .keyboardShortcut("k")
         }
 
         // Vela menu
@@ -120,6 +122,7 @@ struct BrowserCommands: Commands {
                 .keyboardShortcut("d", modifiers: [.command, .shift])
             Button("Full-Page Screenshot") { Task { await store.takeScreenshot(.fullPageImage) } }
                 .keyboardShortcut("s", modifiers: [.command, .shift])
+            VideoMenu(store: store)
             Divider()
         }
 
@@ -174,8 +177,49 @@ struct BrowserCommands: Commands {
                 }
             }
             Divider()
+            Menu("Archived Tabs") {
+                if store.archivedTabs.isEmpty {
+                    Text("No archived tabs")
+                }
+                ForEach(store.archivedTabs.prefix(25)) { item in
+                    Button(item.title.isEmpty ? item.url.absoluteString : item.title) { store.restore(item) }
+                }
+                if !store.archivedTabs.isEmpty {
+                    Divider()
+                    Button("Clear Archived Tabs") { store.clearArchivedTabs() }
+                }
+            }
+            Button("Archive This Tab") {
+                if let tab = store.selectedTab { store.archive(tab) }
+            }
+            .disabled(store.selectedTab?.url == nil || store.selectedTab?.isPrivate == true)
             Button("Put Other Tabs to Sleep") { store.sleepOtherTabs() }
             Button("Site Settings…") { store.isSiteSettingsVisible = true }
         }
+    }
+}
+
+/// View ▸ Video: speed, skip and mute for whatever is playing in this tab.
+struct VideoMenu: View {
+    let store: BrowserStore
+
+    var body: some View {
+        Menu("Video") {
+            Button("Faster") { store.changeVideoSpeed(faster: true) }
+                .keyboardShortcut(".", modifiers: [.command, .control])
+            Button("Slower") { store.changeVideoSpeed(faster: false) }
+                .keyboardShortcut(",", modifiers: [.command, .control])
+            Button("Normal Speed") { store.setVideoSpeed(1) }
+                .keyboardShortcut("0", modifiers: [.command, .control])
+            Divider()
+            Button("Skip Forward 10 Seconds") { store.selectedTab?.skipMedia(by: 10) }
+                .keyboardShortcut(.rightArrow, modifiers: [.command, .control])
+            Button("Skip Back 10 Seconds") { store.selectedTab?.skipMedia(by: -10) }
+                .keyboardShortcut(.leftArrow, modifiers: [.command, .control])
+            Divider()
+            Button(store.selectedTab?.isMuted == true ? "Unmute Tab" : "Mute Tab") { store.selectedTab?.toggleMute() }
+                .keyboardShortcut("m", modifiers: [.command, .control])
+        }
+        .disabled(store.selectedTab?.url == nil)
     }
 }

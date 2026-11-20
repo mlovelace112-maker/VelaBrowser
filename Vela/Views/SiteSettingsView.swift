@@ -203,6 +203,7 @@ struct TabsSettingsSection: View {
                 Text("Put unused tabs to sleep")
                 Text("Frees memory and battery. Pinned tabs and tabs playing sound or using the camera stay awake.")
             }
+            TabArchiveSetting()
             if store.sleepingTabCount > 0 {
                 LabeledContent("Sleeping now", value: "\(store.sleepingTabCount) tabs")
             }

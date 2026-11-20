@@ -98,6 +98,17 @@ struct TabChip: View {
                     .lineLimit(1)
                     .truncationMode(.tail)
                 Spacer(minLength: 0)
+                // Speaker: this tab is playing sound. Click to mute it.
+                if tab.isPlayingAudio || tab.isMuted {
+                    Button { tab.toggleMute() } label: {
+                        Image(systemName: tab.isMuted ? "speaker.slash.fill" : "speaker.wave.2.fill")
+                            .font(.system(size: 9.5, weight: .semibold))
+                            .foregroundStyle(tab.isMuted ? Nightglass.mutedText : Nightglass.accent)
+                    }
+                    .buttonStyle(IconButtonStyle(size: 18))
+                    .help(tab.isMuted ? "Unmute this tab (⌃⌘M)" : "Mute this tab (⌃⌘M)")
+                    .accessibilityLabel(tab.isMuted ? "Unmute tab" : "Mute tab")
+                }
                 if tab.isUsingCamera || tab.isUsingMicrophone {
                     Button { tab.stopCapture() } label: {
                         Image(systemName: tab.isUsingCamera ? "video.fill" : "mic.fill")
@@ -189,6 +200,10 @@ struct TabContextMenu: View {
         }
         Button("Put Tab to Sleep") { tab.sleep() }
             .disabled(tab.isAsleep || tab.url == nil || store.selectedTabID == tab.id)
+        Button(tab.isMuted ? "Unmute Tab" : "Mute Tab") { tab.toggleMute() }
+            .disabled(tab.url == nil)
+        Button("Archive Tab") { store.archive(tab) }
+            .disabled(tab.url == nil || tab.isPrivate)
         Button("Open in Split View") { store.openSplitView(with: tab) }
             .disabled(store.selectedTabID == tab.id)
         if !tab.isPrivate {

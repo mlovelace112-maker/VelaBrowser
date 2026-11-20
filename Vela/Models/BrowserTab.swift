@@ -63,6 +63,16 @@ final class BrowserTab: Identifiable {
     /// True while the page is using your camera or microphone.
     var isUsingCamera = false
     var isUsingMicrophone = false
+    /// True while a video or song on the page is playing with sound (the
+    /// speaker on the tab). See MediaControls.swift.
+    var isPlayingAudio = false
+    /// Muted with the speaker button on the tab. Stays muted on new pages.
+    var isMuted = false
+    /// Video and audio speed for this tab (1 = normal).
+    var playbackRate: Double = 1
+    /// Frames on the current page that have video or audio, so speed and
+    /// mute reach players inside embeds too.
+    @ObservationIgnored var mediaFrames: [String: WKFrameInfo] = [:]
     /// A sleeping tab's page was unloaded to free memory. It loads again,
     /// right where the address was, as soon as you open the tab.
     private(set) var isAsleep = false
@@ -218,6 +228,7 @@ final class BrowserTab: Identifiable {
             contentController.addUserScript(cleaner)
         }
         contentController.addUserScript(LinkChecker.hoverScript())
+        contentController.addUserScript(MediaControls.script())
         contentController.addUserScript(PasswordScripts.loginScript())
         if privacy.fingerprintProtection {
             contentController.addUserScript(Fingerprinting.script(shieldsDownSites: privacy.shieldsDownSites))
@@ -624,6 +635,8 @@ final class TabCoordinator: NSObject, WKNavigationDelegate, WKUIDelegate, WKScri
         tab?.upgradedFrom = nil
         tab?.reissuedURL = nil
         tab?.resetPageStats()
+        tab?.mediaFrames = [:]
+        tab?.isPlayingAudio = false
         // Pop-ups: your per-site choice (Site Settings) or the global switch.
         if let tab {
             tab.setPopupsAllowed(tab.settings().allowsPopups(on: webView.url.map(BrowserStore.siteName)))
@@ -678,6 +691,8 @@ final class TabCoordinator: NSObject, WKNavigationDelegate, WKUIDelegate, WKScri
             guard frame.isMainFrame, tab.settings().linkCheckerEnabled else { return }
             let address = String((body["url"] as? String ?? "").prefix(4096))
             tab.hoveredLink = address.isEmpty ? nil : URL(string: address)
+        case "media":
+            tab.mediaChanged(isAudible: body["audible"] as? Bool ?? false, in: frame)
         case "loginForm":
             guard isSecure else { return }
             tab.loginFrame = frame

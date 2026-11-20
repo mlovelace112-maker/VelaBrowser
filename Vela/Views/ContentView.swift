@@ -79,6 +79,22 @@ struct ContentView: View {
         }
         .ignoresSafeArea()
         .background(Nightglass.background)
+        .background { KeyboardWatcher() }
+        // The command bar (⌘K) floats over everything, near the top.
+        .overlay(alignment: .top) {
+            if store.isCommandBarVisible {
+                ZStack(alignment: .top) {
+                    Color.black.opacity(0.3)
+                        .contentShape(Rectangle())
+                        .onTapGesture { store.isCommandBarVisible = false }
+                    CommandBar()
+                        .padding(.top, 90)
+                }
+                .ignoresSafeArea()
+                .transition(.opacity)
+            }
+        }
+        .animation(.easeOut(duration: 0.15), value: store.isCommandBarVisible)
         .animation(Nightglass.spring, value: store.isSidebarVisible)
         .animation(Nightglass.spring, value: store.verticalTabs)
         .animation(Nightglass.spring, value: store.splitPair)
@@ -218,5 +234,12 @@ private struct PageArea: View {
             }
         }
         .animation(Nightglass.spring, value: store.claude.quickAnswer?.id)
+        .overlay {
+            if let preview = store.linkPreview {
+                LinkPreviewCard(preview: preview)
+                    .transition(.opacity.combined(with: .scale(scale: 0.97)))
+            }
+        }
+        .animation(.easeOut(duration: 0.15), value: store.linkPreview?.id)
     }
 }
