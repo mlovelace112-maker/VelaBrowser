@@ -1,3 +1,4 @@
+import AppKit
 import Foundation
 import Observation
 import WebKit
@@ -307,6 +308,20 @@ final class BrowserTab: Identifiable {
         isAsleep = true
         webView.stopLoading()
         webView.loadHTMLString("", baseURL: nil)
+    }
+
+    /// A small picture of the page, shown when you hover over the tab.
+    /// Kept in memory only.
+    var preview: NSImage?
+
+    /// Takes the hover picture while the page is on screen.
+    func capturePreview() {
+        guard url != nil, !isAsleep, webView.window != nil else { return }
+        let configuration = WKSnapshotConfiguration()
+        configuration.snapshotWidth = 360
+        webView.takeSnapshot(with: configuration) { [weak self] image, _ in
+            if let image { self?.preview = image }
+        }
     }
 
     /// Loads a sleeping tab's page again.

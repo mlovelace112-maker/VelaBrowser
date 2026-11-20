@@ -2,23 +2,31 @@ import AppKit
 import SwiftUI
 
 /// The row of tabs and tab groups along the top of the window.
+///
+/// Tabs shrink as you open more, down to a readable width. Past that the row
+/// scrolls sideways (trackpad swipe or mouse wheel), the edges fade to show
+/// there's more, and ⌄ lists every tab. Pinned tabs always stay in view.
 struct TabStripView: View {
     @Environment(BrowserStore.self) private var store
+    @State private var stripWidth: CGFloat = 1_000
+    @State private var scroller = TabScroller()
+    @State private var position = ScrollPosition(edge: .leading)
+
+    private var compact: Bool { Appearance.shared.settings.compactTabs }
 
     var body: some View {
+        let items = store.stripItems
+        let pinned = items.filter(\.isPinnedTab)
+        let others = items.filter { !$0.isPinnedTab }
+
         HStack(spacing: 4) {
-            ForEach(store.stripItems) { item in
-                switch item {
-                case .group(let group):
-                    GroupChip(group: group)
-                        .transition(.scale(scale: 0.8).combined(with: .opacity))
-                case .tab(let tab):
-                    TabChip(tab: tab)
-                        .transition(.scale(scale: 0.8).combined(with: .opacity))
+            ForEach(pinned) { item in
+                if case .tab(let tab) = item {
+                    TabChip(tab: tab).transition(.scale(scale: 0.8).combined(with: .opacity))
                 }
             }
-
-            NewTabButton()
+            scrollingTabs(others)
+            if scroller.isOverflowing { AllTabsMenu() }
 
             // Empty space you can drag to move the window (the title bar is hidden).
             Color.clear
@@ -34,8 +42,152 @@ struct TabStripView: View {
         }
         .padding(.leading, 80) // room for the red/yellow/green window buttons
         .padding(.trailing, 10)
-        .frame(height: Appearance.shared.settings.compactTabs ? 38 : 44)
-        .animation(Nightglass.spring, value: store.stripItems.map(\.id))
+        .frame(height: compact ? 38 : 44)
+        .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { stripWidth = $0 }
+        .animation(Nightglass.spring, value: items.map(\.id))
+        .onChange(of: store.selectedTabID) { _, id in
+            guard let id, store.selectedTab?.isPinned == false else { return }
+            withAnimation(.easeOut(duration: 0.25)) { position.scrollTo(id: id, anchor: .center) }
+        }
+        .onAppear { scroller.start { delta in scroll(by: delta) } }
+        .onDisappear { scroller.stop() }
+    }
+
+    private func scrollingTabs(_ items: [StripItem]) -> some View {
+        let width = tabWidth(for: items)
+        return ScrollView(.horizontal) {
+            HStack(spacing: 4) {
+                ForEach(items) { item in
+                    switch item {
+                    case .group(let group):
+                        GroupChip(group: group)
+                            .id(group.id)
+                            .transition(.scale(scale: 0.8).combined(with: .opacity))
+                    case .tab(let tab):
+                        TabChip(tab: tab, width: width)
+                            .id(tab.id)
+                            .transition(.scale(scale: 0.8).combined(with: .opacity))
+                    }
+                }
+                NewTabButton()
+            }
+            .scrollTargetLayout()
+            .padding(.horizontal, 2)
+            .frame(maxHeight: .infinity)
+            .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { scroller.contentWidth = $0 }
+        }
+        .scrollIndicators(.never)
+        .scrollPosition($position)
+        .onScrollGeometryChange(for: CGFloat.self) { $0.contentOffset.x } action: { _, x in scroller.offset = x }
+        .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { scroller.viewportWidth = $0 }
+        .frame(maxWidth: scroller.contentWidth > 0 ? scroller.contentWidth : .infinity)
+        .mask { edgeFade }
+        .onHover { scroller.isHovering = $0 }
+    }
+
+    /// Fades whichever edge has more tabs past it.
+    private var edgeFade: some View {
+        HStack(spacing: 0) {
+            LinearGradient(colors: [.clear, .black], startPoint: .leading, endPoint: .trailing)
+                .frame(width: scroller.offset > 1 ? 22 : 0)
+            Rectangle()
+            LinearGradient(colors: [.black, .clear], startPoint: .leading, endPoint: .trailing)
+                .frame(width: scroller.offset < scroller.maxOffset - 1 ? 22 : 0)
+        }
+    }
+
+    /// Shares the room between tabs, but never below a readable width.
+    private func tabWidth(for items: [StripItem]) -> CGFloat {
+        let minimum: CGFloat = compact ? 104 : 124
+        let maximum: CGFloat = compact ? 160 : 200
+        var tabCount = 0
+        var groupCount = 0
+        for item in items {
+            if case .tab = item { tabCount += 1 } else { groupCount += 1 }
+        }
+        guard tabCount > 0 else { return maximum }
+        let pinnedCount = store.tabs.filter(\.isPinned).count
+        // Window buttons, pinned tabs, group labels, +, ⌄, drag space and the group button.
+        let fixed = 90 + CGFloat(pinnedCount) * 40 + CGFloat(groupCount) * 110 + 32 + 32 + 60 + 32
+        let share = (stripWidth - fixed) / CGFloat(tabCount) - 4
+        return min(maximum, max(minimum, share))
+    }
+
+    /// Mouse wheel (up and down) scrolls the tabs sideways.
+    private func scroll(by delta: CGFloat) {
+        let target = min(max(0, scroller.offset - delta), scroller.maxOffset)
+        position.scrollTo(x: target)
+    }
+}
+
+@MainActor
+extension StripItem {
+    var isPinnedTab: Bool {
+        switch self {
+        case .tab(let tab): tab.isPinned
+        case .group: false
+        }
+    }
+}
+
+/// Keeps track of the tab row's scrolling, and turns an ordinary mouse
+/// wheel into sideways scrolling while the pointer is over the tabs.
+@MainActor
+@Observable
+final class TabScroller {
+    var offset: CGFloat = 0
+    var contentWidth: CGFloat = 0
+    var viewportWidth: CGFloat = 0
+    @ObservationIgnored var isHovering = false
+    @ObservationIgnored private var monitor: Any?
+
+    var maxOffset: CGFloat { max(0, contentWidth - viewportWidth) }
+    var isOverflowing: Bool { contentWidth > viewportWidth + 1 }
+
+    func start(_ scroll: @escaping @MainActor (CGFloat) -> Void) {
+        guard monitor == nil else { return }
+        monitor = NSEvent.addLocalMonitorForEvents(matching: .scrollWheel) { [weak self] event in
+            guard let self, self.isHovering, self.isOverflowing,
+                  abs(event.scrollingDeltaY) > abs(event.scrollingDeltaX) else { return event }
+            // A mouse wheel moves in "lines"; a trackpad in points.
+            let step = event.hasPreciseScrollingDeltas ? event.scrollingDeltaY : event.scrollingDeltaY * 12
+            scroll(step)
+            return nil
+        }
+    }
+
+    func stop() {
+        if let monitor { NSEvent.removeMonitor(monitor) }
+        monitor = nil
+    }
+}
+
+/// ⌄ at the end of a long tab row: every tab in a list.
+private struct AllTabsMenu: View {
+    @Environment(BrowserStore.self) private var store
+
+    var body: some View {
+        Menu {
+            ForEach(store.tabs) { tab in
+                Button {
+                    store.select(tab)
+                } label: {
+                    if tab.id == store.selectedTabID {
+                        Label(tab.title, systemImage: "checkmark")
+                    } else {
+                        Text(tab.title)
+                    }
+                }
+            }
+        } label: {
+            Image(systemName: "chevron.down")
+                .font(.system(size: 11, weight: .bold))
+        }
+        .menuStyle(.borderlessButton)
+        .menuIndicator(.hidden)
+        .fixedSize()
+        .frame(width: 28, height: 28)
+        .help("All Tabs (\(store.tabs.count))")
     }
 }
 
@@ -69,7 +221,11 @@ struct TabChip: View {
     @Environment(BrowserStore.self) private var store
     let tab: BrowserTab
     var isVertical = false
+    /// Set by the tab row: every tab gets the same width.
+    var width: CGFloat? = nil
     @State private var isHovering = false
+    @State private var showsPreview = false
+    @State private var previewTask: Task<Void, Never>?
 
     var body: some View {
         let isSelected = store.selectedTabID == tab.id
@@ -128,7 +284,7 @@ struct TabChip: View {
             }
         }
         .padding(.horizontal, tab.isPinned ? 0 : 10)
-        .frame(width: tab.isPinned ? 36 : nil)
+        .frame(width: tab.isPinned ? 36 : width)
         .frame(minWidth: tab.isPinned ? 36 : (isVertical ? 0 : (compact ? 70 : 90)),
                maxWidth: tab.isPinned ? 36 : (isVertical ? .infinity : (compact ? 160 : 200)))
         .frame(height: compact ? 26 : 30)
@@ -170,7 +326,13 @@ struct TabChip: View {
                 store.select(tab)
             }
         }
-        .onHover { isHovering = $0 }
+        .onHover { hovering in
+            isHovering = hovering
+            hoverPreview(hovering)
+        }
+        .popover(isPresented: $showsPreview, arrowEdge: isVertical ? .trailing : .bottom) {
+            TabPreviewCard(tab: tab)
+        }
         .animation(.easeOut(duration: 0.15), value: isHovering)
         .help(tab.isAsleep ? "\(tab.title) (sleeping to save memory)"
               : container.map { "\(tab.title) (\($0.name))" } ?? (tab.isPinned ? tab.title : ""))
@@ -178,6 +340,50 @@ struct TabChip: View {
         .accessibilityLabel(tab.title)
         .accessibilityAddTraits(.isButton)
         .contextMenu { TabContextMenu(tab: tab) }
+    }
+
+    /// After resting on another tab for a moment, show a picture of its page.
+    private func hoverPreview(_ hovering: Bool) {
+        previewTask?.cancel()
+        guard hovering, store.selectedTabID != tab.id, tab.url != nil,
+              UserDefaults.standard.object(forKey: "vela.tabPreviews") as? Bool ?? true else {
+            showsPreview = false
+            return
+        }
+        previewTask = Task {
+            try? await Task.sleep(for: .milliseconds(650))
+            guard !Task.isCancelled else { return }
+            showsPreview = true
+        }
+    }
+}
+
+/// The picture and address shown when you hover over a tab.
+private struct TabPreviewCard: View {
+    let tab: BrowserTab
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            if let preview = tab.preview {
+                Image(nsImage: preview)
+                    .resizable()
+                    .scaledToFill()
+                    .frame(width: 300, height: 180, alignment: .top)
+                    .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+            }
+            Text(tab.title)
+                .font(.system(size: 12.5, weight: .semibold))
+                .foregroundStyle(Nightglass.text)
+                .lineLimit(2)
+            HStack(spacing: 6) {
+                Text(tab.url?.host() ?? "")
+                if tab.isAsleep { Text("· Sleeping to save memory") }
+            }
+            .font(.system(size: 11))
+            .foregroundStyle(Nightglass.mutedText)
+        }
+        .padding(10)
+        .frame(width: 320, alignment: .leading)
     }
 }
 
