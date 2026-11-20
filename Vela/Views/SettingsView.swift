@@ -22,6 +22,8 @@ struct SettingsView: View {
                 .tabItem { Label("Claude", systemImage: "sparkle") }
             SpotifySettingsTab()
                 .tabItem { Label("Spotify", systemImage: "music.note") }
+            ShortcutSettingsTab()
+                .tabItem { Label("Shortcuts", systemImage: "keyboard") }
         }
         .frame(width: 560, height: 560)
     }

@@ -228,6 +228,8 @@ If a step fails, make the same change by hand in the repo's **Settings**: Code s
 |---|---|
 | **Themes** | Settings ▸ Appearance: Nightglass, Aurora, Ember, Ocean, Rose and Graphite. Pick any accent color and how strong the background glow is. |
 | **Customize the window** | Show or hide the bookmarks bar, compact tabs, the bookmarks and share buttons, animations, and each part of the New Tab page. |
+| **Highlights & notes** | Select text, right-click ▸ Highlight (or Highlight with Note…). Highlights come back each time you open the page. See them all in Bookmarks ▸ Highlights & Notes (⇧⌘H). Saved only on your Mac, never in private tabs. |
+| **Custom keyboard shortcuts** | Settings ▸ Shortcuts: click any menu command's shortcut and press new keys, turn it off, or go back to the built-in one. A warning shows if two commands share keys. |
 
 The app also has a custom icon: a "V" drawn as the Vela constellation. Its source is `docs/icon-source.svg`.
 

@@ -57,6 +57,8 @@ enum TextAction {
 final class VelaWebView: WKWebView {
     /// Set by the store; runs when you pick a Claude item from the menu.
     var onTextAction: ((TextAction) -> Void)?
+    /// Set by the store; Highlight (false) or Highlight with Note… (true).
+    var onHighlight: ((Bool) -> Void)?
 
     override func willOpenMenu(_ menu: NSMenu, with event: NSEvent) {
         super.willOpenMenu(menu, with: event)
@@ -74,9 +76,22 @@ final class VelaWebView: WKWebView {
         if hasSelection {
             added.append(submenu("Ask Claude", [.explain, .summarize, .define, .translate, .askAbout]))
         }
+        if hasSelection, !isEditable, onHighlight != nil {
+            added.append(action("Highlight", symbol: "highlighter") { [weak self] in self?.onHighlight?(false) })
+            added.append(action("Highlight with Note…", symbol: "note.text") { [weak self] in self?.onHighlight?(true) })
+        }
         guard !added.isEmpty else { return }
         menu.insertItem(.separator(), at: 0)
         for item in added.reversed() { menu.insertItem(item, at: 0) }
+    }
+
+    private func action(_ title: String, symbol: String, _ run: @escaping () -> Void) -> NSMenuItem {
+        let handler = MenuHandler(run)
+        let item = NSMenuItem(title: title, action: #selector(MenuHandler.run), keyEquivalent: "")
+        item.image = NSImage(systemSymbolName: symbol, accessibilityDescription: nil)
+        item.target = handler
+        item.representedObject = handler
+        return item
     }
 
     private func submenu(_ title: String, _ actions: [TextAction]) -> NSMenuItem {
