@@ -12,7 +12,15 @@ import WebKit
 @MainActor
 @Observable
 final class BrowserStore {
-    var tabs: [BrowserTab] = []
+    var tabs: [BrowserTab] = [] {
+        didSet {
+            // Tell running Safari extensions about tabs that opened or closed.
+            let before = Set(oldValue.map(\.id)), after = Set(tabs.map(\.id))
+            guard before != after else { return }
+            for tab in tabs where !before.contains(tab.id) { extensions.tabOpened(tab) }
+            for tab in oldValue where !after.contains(tab.id) { extensions.tabClosed(tab) }
+        }
+    }
     var groups: [TabGroup] = []
     /// Separate cookie jars for tabs (Personal, Work…). See Containers.swift.
     var containers: [TabContainer] = BrowserStore.loadContainers()
@@ -34,6 +42,7 @@ final class BrowserStore {
                 old.lastActive = Date()
                 old.capturePreview() // still on screen at this moment
             }
+            extensions.tabActivated(selectedTab, previous: tabs.first { $0.id == oldValue })
             if let tab = selectedTab {
                 tab.lastActive = Date()
                 if !isStarting { tab.wake() }
@@ -143,6 +152,8 @@ final class BrowserStore {
 
     // Claude
     let claude = ClaudeAssistant()
+    /// Safari extensions from your Mac's apps (SafariExtensions.swift).
+    let extensions: SafariExtensions
     /// Talk to Claude (⌥⌘A).
     let voice = VoiceInput()
     var isClaudePanelVisible = false
@@ -166,8 +177,13 @@ final class BrowserStore {
     @ObservationIgnored private var recentlyClosed: [ClosedTab] = []
 
     init() {
+        let extensions = SafariExtensions()
+        self.extensions = extensions
         let config = WKWebViewConfiguration()
         config.websiteDataStore = .default()
+        // Normal tabs (and containers, which copy this) can run extensions;
+        // private tabs never do.
+        config.webExtensionController = extensions.controller
         // Identify as Safari so websites serve their normal desktop pages.
         config.applicationNameForUserAgent = "Version/18.0 Safari/605.1.15"
         Self.harden(config)
@@ -186,6 +202,8 @@ final class BrowserStore {
         downloadManager.checkThreat = { [weak self] url in await self?.safeBrowsing.check(url) }
         if !restoreSession() { newTab() }
         claude.store = self
+        extensions.store = self
+        extensions.start()
         Task {
             await refreshBlockingRules()
             isStarting = false
@@ -287,6 +305,7 @@ final class BrowserStore {
             guard let self, let tab else { return }
             self.recordVisit(tab)
             self.rememberPage(in: tab)
+            self.extensions.tabChanged(tab)
             if tab.id == self.selectedTabID {
                 Task {
                     try? await Task.sleep(for: .seconds(1))

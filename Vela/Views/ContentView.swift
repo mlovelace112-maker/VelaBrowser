@@ -193,6 +193,14 @@ private struct PageArea: View {
             }
         }
         .animation(Nightglass.spring, value: store.passwordPrompt)
+        .overlay(alignment: .top) {
+            if let request = store.extensions.requests.first(where: { $0.tabID == nil || $0.tabID == store.selectedTabID }) {
+                ExtensionAccessBanner(request: request)
+                    .padding(14)
+                    .transition(.move(edge: .top).combined(with: .opacity))
+            }
+        }
+        .animation(Nightglass.spring, value: store.extensions.requests)
         .overlay(alignment: .topLeading) {
             if let tab = store.selectedTab, let request = tab.permissionRequest {
                 PermissionBanner(tab: tab, request: request)
