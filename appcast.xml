@@ -4,6 +4,16 @@
     <title>Vela</title>
     <description>Updates for the Vela browser</description>
     <item>
+      <title>Vela 1.0-beta.24</title>
+      <pubDate>Fri, 20 Nov 2026 19:30:20 GMT</pubDate>
+      <sparkle:version>24</sparkle:version>
+      <sparkle:shortVersionString>1.0-beta.24</sparkle:shortVersionString>
+      <sparkle:minimumSystemVersion>15.0</sparkle:minimumSystemVersion>
+      <sparkle:channel>beta</sparkle:channel>
+      <description>&lt;p&gt;A beta build with the newest changes.&lt;/p&gt;&lt;ul&gt;&lt;li&gt;Fix build: read pinned state on the main actor&lt;/li&gt;&lt;li&gt;Add a scrolling tab bar and tab previews on hover&lt;/li&gt;&lt;/ul&gt;</description>
+      <enclosure url="https://github.com/mlovelace112-maker/VelaBrowser/releases/download/v1.0-beta.24/Vela-1.0-beta.24.zip" sparkle:edSignature="FZsnEpT1dFRFTwzE6ZweDAKI1ES7WpAbp58UvHT/mxo2do97c9jssPTfj8KN6R+RMEtCTwLhzIpPDlL1WlfNDw==" length="8519355" type="application/octet-stream" />
+    </item>
+    <item>
       <title>Vela 1.0-beta.23</title>
       <pubDate>Fri, 20 Nov 2026 06:34:57 GMT</pubDate>
       <sparkle:version>23</sparkle:version>
