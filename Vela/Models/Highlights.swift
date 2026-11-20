@@ -94,7 +94,7 @@ enum HighlightScripts {
       while ((node = walker.nextNode())) { nodes.push({ node, start: full.length }); full += node.data; }
       return { nodes, full };
     }
-    function velaWrap(nodes, start, end, id, note) {
+    function velaWrap(nodes, start, end, id) {
       for (const item of nodes) {
         const nodeEnd = item.start + item.node.data.length;
         if (nodeEnd <= start || item.start >= end) continue;
@@ -108,7 +108,6 @@ enum HighlightScripts {
         const mark = document.createElement('mark');
         mark.dataset.velaHl = id;
         mark.style.cssText = 'background: rgba(255, 214, 92, 0.55); color: inherit; border-radius: 2px; padding: 0;';
-        if (note) mark.title = note;
         target.parentNode.insertBefore(mark, target);
         mark.appendChild(target);
       }
@@ -128,7 +127,7 @@ enum HighlightScripts {
     if (!text.trim()) return null;
     const { nodes, full } = velaFull();
     const end = start + text.length;
-    velaWrap(nodes, start, end, id, '');
+    velaWrap(nodes, start, end, id);
     selection.removeAllRanges();
     return { text, prefix: full.slice(Math.max(0, start - 32), start), suffix: full.slice(end, end + 32) };
     """
@@ -141,7 +140,7 @@ enum HighlightScripts {
       let start = full.indexOf(h.prefix + h.text + h.suffix);
       if (start >= 0) start += h.prefix.length; else start = full.indexOf(h.text);
       if (start < 0) continue;
-      velaWrap(nodes, start, start + h.text.length, h.id, h.note);
+      velaWrap(nodes, start, start + h.text.length, h.id);
     }
     return true;
     """
@@ -151,10 +150,6 @@ enum HighlightScripts {
     return true;
     """
 
-    static let setNote = """
-    document.querySelectorAll('mark[data-vela-hl="' + id + '"]').forEach(mark => { mark.title = note; });
-    return true;
-    """
 }
 
 extension BrowserStore {
@@ -184,15 +179,14 @@ extension BrowserStore {
         guard !tab.isPrivate, let url = tab.url else { return }
         let saved = highlights.highlights(for: url)
         guard !saved.isEmpty else { return }
-        let list = saved.map { ["id": $0.id.uuidString, "text": $0.text, "prefix": $0.prefix, "suffix": $0.suffix, "note": $0.note] }
+        let list = saved.map { ["id": $0.id.uuidString, "text": $0.text, "prefix": $0.prefix, "suffix": $0.suffix] }
         Task { _ = try? await tab.runScript(HighlightScripts.restore, arguments: ["highlights": list]) }
     }
 
     func setHighlightNote(_ note: String, for id: UUID) {
+        // Notes stay in Vela: they're never put into the page, where the
+        // website's own scripts could read them.
         highlights.setNote(note, for: id)
-        for tab in tabs where !tab.isPrivate {
-            Task { _ = try? await tab.runScript(HighlightScripts.setNote, arguments: ["id": id.uuidString, "note": note]) }
-        }
     }
 
     func removeHighlight(_ id: UUID) {

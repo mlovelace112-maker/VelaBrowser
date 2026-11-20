@@ -35,7 +35,7 @@ enum BrowserTools {
                  "Read the text of the web page in a tab, plus any text the user has selected there. Use this to summarize, answer questions about, or compare pages.",
                  ["tab_id": tabID]),
             tool("open_url",
-                 "Open a web address, or search the web for some words, in a new tab (the default) or in the selected tab.",
+                 "Open a web address, or search the web for some words, in a new tab (the default) or in the selected tab. After a page has been read, Vela asks the user to approve each address first.",
                  [
                      "url": ["type": "string", "description": "A web address such as https://example.com, or words to search for."],
                      "new_tab": ["type": "boolean", "description": "true (default) opens a new tab; false replaces the selected tab's page."],
@@ -102,6 +102,7 @@ enum BrowserTools {
             let total = (result["length"] as? NSNumber)?.intValue ?? text.count
             let selection = result["selection"] as? String ?? ""
             assistant.addAction("doc.text", "Read “\(tab.title)”", to: replyID)
+            assistant.hasReadWebContent = true
 
             var output = "Title: \(tab.title)\nAddress: \(url.absoluteString)\n"
             if total > text.count { output += "(Showing the first \(text.count) of \(total) characters.)\n" }
@@ -118,6 +119,18 @@ enum BrowserTools {
                 throw ToolError("Vela only opens http and https addresses.")
             }
             let inNewTab = try optionalBool(input, "new_tab") ?? true
+            // Asks first when a web page could be steering Claude, and for
+            // addresses on your own Mac or home network (routers, printers).
+            let isLocal = HTTPSOnly.isLocal(url.host() ?? "")
+            if assistant.hasReadWebContent || isLocal {
+                let address = url.absoluteString
+                let allowed = await assistant.confirm(
+                    "Open \(BrowserStore.siteName(url))?",
+                    detail: "Claude wants to open:\n\(address.count > 300 ? String(address.prefix(300)) + "…" : address)",
+                    allowLabel: "Open"
+                )
+                guard allowed else { throw ToolError("The user chose not to open this address.") }
+            }
             let tab: BrowserTab
             if !inNewTab, let current = store.selectedTab {
                 tab = current
@@ -168,6 +181,7 @@ enum BrowserTools {
                 throw ToolError("The click didn't work: \(error.localizedDescription)")
             }
             assistant.addAction("cursorarrow.click", "Clicked “\(found)”", to: replyID)
+            assistant.hasReadWebContent = true
             await waitForLoad(tab)
             return "Clicked “\(found)”. The tab now shows “\(tab.title)” (\(tab.url?.absoluteString ?? ""))."
 

@@ -1043,7 +1043,9 @@ final class BrowserStore {
 
     /// "Allow once": opens the blocked pop-up as a new tab.
     func allowBlockedPopup() {
-        guard let popup = blockedPopup, let url = popup.url else {
+        // The address comes from the page itself, so only web addresses open.
+        guard let popup = blockedPopup, let url = popup.url,
+              ["http", "https"].contains(url.scheme?.lowercased() ?? "") else {
             blockedPopup = nil
             return
         }

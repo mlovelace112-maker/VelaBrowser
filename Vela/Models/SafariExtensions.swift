@@ -331,13 +331,26 @@ extension SafariExtensions: WKWebExtensionControllerDelegate {
         completionHandler(adapter(for: tab), nil)
     }
 
-    /// Features like storage: allowed, as Safari does.
+    /// An extension asks for more features while running (its "optional"
+    /// permissions, like reading cookies or history). The ones it listed when
+    /// you turned it on were already allowed; anything new asks you first.
     func webExtensionController(_ controller: WKWebExtensionController,
                                 promptForPermissions permissions: Set<WKWebExtension.Permission>,
                                 in tab: (any WKWebExtensionTab)?,
                                 for extensionContext: WKWebExtensionContext,
                                 completionHandler: @escaping (Set<WKWebExtension.Permission>, Date?) -> Void) {
-        completionHandler(permissions, nil)
+        let alreadyListed = extensionContext.webExtension.requestedPermissions
+        let new = permissions.subtracting(alreadyListed)
+        guard !new.isEmpty else { return completionHandler(permissions, nil) }
+        let name = self.name(of: extensionContext.uniqueIdentifier)
+        let alert = NSAlert()
+        alert.messageText = "Allow “\(name)” to use more features?"
+        alert.informativeText = "It's asking for: " + new.map(\.rawValue).sorted().joined(separator: ", ")
+            + ".\n\nOnly allow this if you trust the extension and expected it to ask."
+        alert.addButton(withTitle: "Don't Allow")
+        alert.addButton(withTitle: "Allow")
+        let allowed = alert.runModal() == .alertSecondButtonReturn
+        completionHandler(allowed ? permissions : permissions.subtracting(new), nil)
     }
 
     /// An extension asks for sites while running: ask you about this tab's site.

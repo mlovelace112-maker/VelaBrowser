@@ -324,6 +324,9 @@ enum PasswordScripts {
     /// Fills `username` and `password` into the page. Typed the way a person
     /// would, so sites built with React and similar frameworks notice.
     static let fillFunction = """
+    const here = location.hostname.toLowerCase().replace(/^www\\./, '');
+    if (location.protocol !== 'https:' && here !== 'localhost') return 'none';
+    if (here !== site) return 'none';
     \(helpers)
     const setValue = (el, value) => {
       const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set;
