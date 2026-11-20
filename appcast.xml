@@ -4,6 +4,16 @@
     <title>Vela</title>
     <description>Updates for the Vela browser</description>
     <item>
+      <title>Vela 1.0-beta.18</title>
+      <pubDate>Fri, 20 Nov 2026 05:18:14 GMT</pubDate>
+      <sparkle:version>18</sparkle:version>
+      <sparkle:shortVersionString>1.0-beta.18</sparkle:shortVersionString>
+      <sparkle:minimumSystemVersion>15.0</sparkle:minimumSystemVersion>
+      <sparkle:channel>beta</sparkle:channel>
+      <description>&lt;p&gt;A beta build with the newest changes.&lt;/p&gt;&lt;ul&gt;&lt;li&gt;Fix a name clash in the command bar&lt;/li&gt;&lt;li&gt;Add command bar, link preview, tab tidy-up and video controls&lt;/li&gt;&lt;/ul&gt;</description>
+      <enclosure url="https://github.com/mlovelace112-maker/VelaBrowser/releases/download/v1.0-beta.18/Vela-1.0-beta.18.zip" sparkle:edSignature="/9yICVlDroT4ni7Og3NQgX518QHzvihv+gRdqM5vPIxvtkMcIvGYgbektaE4NjvIAzx2HSmUdvS347yH8VclDw==" length="7433459" type="application/octet-stream" />
+    </item>
+    <item>
       <title>Vela 1.0-beta.17</title>
       <pubDate>Thu, 19 Nov 2026 21:52:53 GMT</pubDate>
       <sparkle:version>17</sparkle:version>
