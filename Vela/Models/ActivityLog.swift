@@ -144,7 +144,7 @@ struct ActivitySummary {
     var popupsBlocked: Int
     var activeDays: Int
 
-    init(log: ActivityLog, endingOn end: Date = Date(), days count: Int = 7) {
+    @MainActor init(log: ActivityLog, endingOn end: Date = Date(), days count: Int = 7) {
         let calendar = Calendar.current
         let lastDay = calendar.startOfDay(for: end)
         dates = (0..<count).reversed().compactMap { calendar.date(byAdding: .day, value: -$0, to: lastDay) }
