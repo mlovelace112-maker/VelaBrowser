@@ -89,12 +89,14 @@ extension BrowserStore {
 
     /// Asks Claude for a JSON reply and decodes it.
     static func askClaudeForJSON<T: Decodable>(_ type: T.Type, model: ClaudeModel = .haiku, system: String,
-                                               prompt: String, maxTokens: Int = 4_000) async throws -> T {
+                                               prompt: String) async throws -> T {
         let request = ClaudeRequest(
             model: model,
             system: system + " Reply with JSON only, no other text.",
             messages: [["role": "user", "content": prompt]],
-            maxTokens: maxTokens,
+            // Generous on purpose: only what Claude writes is billed, and a
+            // tight limit can cut the answer off before the JSON ends.
+            maxTokens: 16_000,
             effort: "low"
         )
         let response = try await ClaudeClient.stream(request) { _ in }
@@ -102,7 +104,9 @@ extension BrowserStore {
         let text = response.text
         guard let start = text.firstIndex(of: "{"), let end = text.lastIndex(of: "}"), start < end,
               let value = try? JSONDecoder().decode(T.self, from: Data(text[start...end].utf8)) else {
-            throw PageToolError.message("Claude's answer didn't come back in the expected shape. Try again.")
+            throw PageToolError.message(response.stopReason == "max_tokens"
+                ? "Claude's answer was cut off. Try again."
+                : "Claude's answer didn't come back in the expected shape. Try again.")
         }
         return value
     }
@@ -111,9 +115,10 @@ extension BrowserStore {
     func readablePageText(of tab: BrowserTab, limit: Int) async -> String? {
         if tab.isAsleep {
             tab.wake()
-            for _ in 0..<40 {
+            // Give the page a moment to start loading, then wait (up to 10 s) for it to finish.
+            try? await Task.sleep(for: .milliseconds(600))
+            for _ in 0..<38 where tab.isLoading || tab.isAsleep {
                 try? await Task.sleep(for: .milliseconds(250))
-                if !tab.isLoading && !tab.isAsleep { break }
             }
         }
         let script = """
@@ -187,7 +192,7 @@ extension BrowserStore {
             """
             do {
                 var result = try await Self.askClaudeForJSON(TabComparison.self, model: .sonnet, system: system,
-                                                             prompt: listing, maxTokens: 3_000)
+                                                             prompt: listing)
                 result.columns = pages.map { $0.title.isEmpty ? (BrowserStore.siteName($0.url)) : $0.title }
                 result.rows = result.rows.map { row in
                     var row = row
@@ -195,7 +200,7 @@ extension BrowserStore {
                     return row
                 }
                 if !skipped.isEmpty {
-                    result.summary += "\n\nLeft out (password box on the page): " + skipped.joined(separator: ", ")
+                    result.summary += "\n\nLeft out (Vela couldn't read them, or they have a password box): " + skipped.joined(separator: ", ")
                 }
                 finishTool(id) { $0.comparison = result }
             } catch {
@@ -242,7 +247,7 @@ extension BrowserStore {
             """
             do {
                 var result = try await Self.askClaudeForJSON(VideoSummary.self, system: system,
-                                                             prompt: "Video: \(title)\n\n\(source)", maxTokens: 2_000)
+                                                             prompt: "Video: \(title)\n\n\(source)")
                 result.fromTranscript = hasTranscript
                 finishTool(id) { $0.video = result }
             } catch {
@@ -298,6 +303,25 @@ extension BrowserStore {
         }
       }
     } catch (e) {}
+    // YouTube often refuses that caption download now. Then open the page's own
+    // "Show transcript" panel and read it.
+    if (!lines.length) {
+      const segments = () => document.querySelectorAll('ytd-transcript-segment-renderer');
+      if (!segments().length) {
+        const button = document.querySelector('ytd-video-description-transcript-section-renderer button');
+        if (button) {
+          button.click();
+          for (let i = 0; i < 24 && !segments().length; i++) await new Promise(r => setTimeout(r, 250));
+        }
+      }
+      for (const segment of segments()) {
+        const stamp = (segment.querySelector('.segment-timestamp')?.textContent || '').trim();
+        const text = (segment.querySelector('.segment-text')?.textContent || '').replace(/\s+/g, ' ').trim();
+        if (!text) continue;
+        const seconds = stamp.split(':').reduce((total, part) => total * 60 + (parseInt(part, 10) || 0), 0);
+        lines.push('[' + seconds + '] ' + text);
+      }
+    }
     return {
       title: document.title.replace(/ - YouTube$/, ''),
       description: description.slice(0, 4000),
@@ -361,7 +385,7 @@ extension BrowserStore {
             sentence", "reasons": ["2 to 5 short reasons, plain language"]}.
             """
             do {
-                var result = try await Self.askClaudeForJSON(SiteCheck.self, system: system, prompt: prompt, maxTokens: 1_000)
+                var result = try await Self.askClaudeForJSON(SiteCheck.self, system: system, prompt: prompt)
                 // Google's list outranks anything else.
                 if signals.contains(where: { $0.hasPrefix("Google Safe Browsing lists") }) { result.verdict = .danger }
                 result.signals = signals

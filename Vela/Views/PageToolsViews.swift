@@ -329,6 +329,6 @@ struct ClaudeToolsMenu: View {
         .disabled(store.selectedTab?.url == nil)
         Divider()
         Button("Organize Bookmarks with Claude") { store.organizeBookmarks() }
-            .disabled(store.bookmarks.count < 3 || store.isOrganizingBookmarks)
+            .disabled(store.isOrganizingBookmarks)
     }
 }
