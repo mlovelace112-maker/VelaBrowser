@@ -41,6 +41,10 @@ final class BrowserTab: Identifiable {
     var savedLogins: [PasswordEntry] = []
     /// Set when a site has no secure (https) version: the "Not Secure" warning.
     var httpsWarning: URL?
+    /// Set when focus mode stopped this page from opening (the "Stay focused" screen).
+    var focusBlocked: URL?
+    /// Asks the store whether focus mode blocks an address right now.
+    @ObservationIgnored var isFocusBlocked: ((URL) -> Bool)?
     /// Shows the list of saved logins under the key button.
     var isLoginPickerShown = false
     /// Set once Vela has filled (or tried to fill) a login on this page, so
@@ -197,6 +201,7 @@ final class BrowserTab: Identifiable {
 
     func load(_ url: URL) {
         isAsleep = false
+        if focusBlocked != url { focusBlocked = nil }
         mediaSearch = nil
         reader = nil
         self.url = url
@@ -229,6 +234,7 @@ final class BrowserTab: Identifiable {
         }
         contentController.addUserScript(LinkChecker.hoverScript())
         contentController.addUserScript(MediaControls.script())
+        contentController.addUserScript(DarkMode.script())
         contentController.addUserScript(PasswordScripts.loginScript())
         if privacy.fingerprintProtection {
             contentController.addUserScript(Fingerprinting.script(shieldsDownSites: privacy.shieldsDownSites))
@@ -522,6 +528,12 @@ final class TabCoordinator: NSObject, WKNavigationDelegate, WKUIDelegate, WKScri
 
         let isMainFrame = navigationAction.targetFrame?.isMainFrame ?? true
         let pageURL = isMainFrame ? navigationAction.request.url : webView.url
+
+        // Focus mode: show "Stay focused" instead of a distracting site.
+        if isMainFrame, let url = navigationAction.request.url, tab.isFocusBlocked?(url) == true {
+            tab.focusBlocked = url
+            return (.cancel, preferences)
+        }
 
         // Hardening: a web page may never open files on your Mac (file://).
         // Files you open yourself from Finder still work, because those

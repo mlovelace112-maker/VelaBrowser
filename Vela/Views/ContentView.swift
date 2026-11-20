@@ -63,6 +63,10 @@ struct ContentView: View {
                     PageArea()
                 }
 
+                if store.isWebPanelVisible {
+                    WebPanelView()
+                        .transition(.move(edge: .trailing).combined(with: .opacity))
+                }
                 if store.isClaudePanelVisible {
                     ClaudePanel()
                         .transition(.move(edge: .trailing).combined(with: .opacity))
@@ -99,6 +103,7 @@ struct ContentView: View {
         .animation(Nightglass.spring, value: store.verticalTabs)
         .animation(Nightglass.spring, value: store.splitPair)
         .animation(Nightglass.spring, value: store.isClaudePanelVisible)
+        .animation(Nightglass.spring, value: store.isWebPanelVisible)
         .animation(Nightglass.spring, value: store.spotify.isBarVisible)
         .animation(Nightglass.spring, value: store.isFindBarVisible)
         .sheet(isPresented: $store.isCookieManagerVisible) {
@@ -142,7 +147,11 @@ private struct PageArea: View {
         ZStack {
             NightglassBackdrop()
             if let tab = store.selectedTab {
-                if let search = tab.mediaSearch {
+                if let blocked = tab.focusBlocked {
+                    FocusBlockedView(tab: tab, url: blocked)
+                        .id(tab.id)
+                        .transition(.opacity)
+                } else if let search = tab.mediaSearch {
                     MediaSearchView(tab: tab, search: search)
                         .id(tab.id)
                         .transition(.opacity)

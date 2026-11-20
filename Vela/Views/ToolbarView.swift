@@ -88,6 +88,8 @@ struct ToolbarView: View {
                     .help("Share")
                 }
 
+                SiteToolbarItems()
+
                 ClaudeButton()
 
                 PageMenu(tab: tab)

@@ -123,6 +123,7 @@ struct BrowserCommands: Commands {
             Button("Full-Page Screenshot") { Task { await store.takeScreenshot(.fullPageImage) } }
                 .keyboardShortcut("s", modifiers: [.command, .shift])
             VideoMenu(store: store)
+            SiteToolsMenu(store: store)
             Divider()
         }
 
@@ -221,5 +222,30 @@ struct VideoMenu: View {
                 .keyboardShortcut("m", modifiers: [.command, .control])
         }
         .disabled(store.selectedTab?.url == nil)
+    }
+}
+
+/// View menu: dark mode, web panels and focus mode.
+struct SiteToolsMenu: View {
+    let store: BrowserStore
+
+    var body: some View {
+        Toggle("Dark Mode for This Site", isOn: Binding(
+            get: { store.selectedTab.map { store.isDarkModeOn(for: $0) } ?? false },
+            set: { _ in if let tab = store.selectedTab { store.toggleDarkMode(for: tab) } }
+        ))
+        .disabled(!store.darkModeEverywhere || store.selectedTab?.url == nil)
+        Button(store.isWebPanelVisible ? "Hide Web Panels" : "Show Web Panels") { store.toggleWebPanels() }
+            .keyboardShortcut("p", modifiers: [.command, .control])
+        Menu("Focus") {
+            if store.isFocusActive {
+                Button("Turn Off Focus Mode") { store.stopFocus() }
+            } else {
+                Button("Focus for 25 Minutes") { store.startFocus(minutes: 25) }
+                Button("Focus for 1 Hour") { store.startFocus(minutes: 60) }
+                Button("Focus for 2 Hours") { store.startFocus(minutes: 120) }
+                Button("Focus Until I Turn It Off") { store.startFocus(minutes: nil) }
+            }
+        }
     }
 }

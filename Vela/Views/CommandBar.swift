@@ -283,7 +283,22 @@ enum CommandSearch {
                 NSApp.sendAction(Selector(("showSettingsWindow:")), to: nil, from: nil)
             },
             command("Check for Updates", "arrow.down.circle", "update") { Updater.shared.checkNow() },
+            command(store.isWebPanelVisible ? "Hide Web Panels" : "Show Web Panels", "rectangle.righthalf.inset.filled", "calendar gmail sidebar") {
+                store.toggleWebPanels()
+            },
+            command(store.darkModeEverywhere ? "Turn Off Dark Mode for Websites" : "Turn On Dark Mode for Websites", "moon", "theme night") {
+                store.darkModeEverywhere.toggle()
+            },
         ]
+        if store.isFocusActive {
+            list.append(command("Turn Off Focus Mode", "leaf", "distraction block") { store.stopFocus() })
+        } else {
+            list += [
+                command("Focus for 25 Minutes", "leaf", "distraction block youtube pomodoro") { store.startFocus(minutes: 25) },
+                command("Focus for 1 Hour", "leaf", "distraction block youtube") { store.startFocus(minutes: 60) },
+                command("Focus Until I Turn It Off", "leaf", "distraction block youtube") { store.startFocus(minutes: nil) },
+            ]
+        }
         if !store.archivedTabs.isEmpty {
             list.append(command("Show Archived Tabs", "archivebox", "tidy") {
                 store.showNotice("Archived tabs are in the Tabs menu, or type their name here")
@@ -312,6 +327,11 @@ enum CommandSearch {
                 command("Normal Video Speed", "play", "speed playback") { store.setVideoSpeed(1) },
                 command("Summarize This Page", "sparkle", "claude tldr") { store.askClaudeInPanel("Summarize this page") },
             ]
+            if store.darkModeEverywhere {
+                list.append(command(store.isDarkModeOn(for: tab) ? "Dark Mode Off for This Site" : "Dark Mode On for This Site", "moon", "theme night") {
+                    store.toggleDarkMode(for: tab)
+                })
+            }
             if tab.pageLanguage != nil {
                 list.append(command("Translate Page", "translate") { tab.translateRequests += 1 })
             }
