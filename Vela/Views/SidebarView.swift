@@ -97,7 +97,7 @@ struct SidebarView: View {
     private var bookmarksList: some View {
         let items = store.bookmarks.filter(matches)
         let folders = store.bookmarkFolders
-        if store.claude.hasKey && store.bookmarks.count >= 3 && search.isEmpty {
+        if store.claude.hasKey && !store.bookmarks.isEmpty && search.isEmpty {
             organizeButton(hasFolders: !folders.isEmpty)
         }
         if items.isEmpty {
