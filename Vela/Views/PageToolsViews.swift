@@ -1,7 +1,7 @@
 import SwiftUI
 
 /// The sheet for Claude's page tools: Compare Tabs, Video Summary and
-/// Is This Site Legit? (see PageTools.swift).
+/// Is This Site Legit? (see ClaudePageTools.swift).
 struct PageToolSheet: View {
     @Environment(BrowserStore.self) private var store
     @Environment(\.dismiss) private var dismiss
