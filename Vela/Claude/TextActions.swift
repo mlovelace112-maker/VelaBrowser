@@ -163,6 +163,13 @@ extension BrowserStore {
     /// A Claude item from the right-click menu.
     func perform(_ action: TextAction, in tab: BrowserTab) {
         Task {
+            // Sign-in pages stay private from Claude, as everywhere else in Vela.
+            let hasPassword = (try? await tab.runScript(
+                "return !!document.querySelector('input[type=\"password\"]');", arguments: [:]) as? Bool) ?? false
+            if hasPassword {
+                showNotice("This page has a password box, so Vela keeps it private from Claude")
+                return
+            }
             if action.isRewrite {
                 await rewriteField(action, in: tab)
             } else {
