@@ -4,6 +4,16 @@
     <title>Vela</title>
     <description>Updates for the Vela browser</description>
     <item>
+      <title>Vela 1.0-beta.25</title>
+      <pubDate>Fri, 20 Nov 2026 19:35:55 GMT</pubDate>
+      <sparkle:version>25</sparkle:version>
+      <sparkle:shortVersionString>1.0-beta.25</sparkle:shortVersionString>
+      <sparkle:minimumSystemVersion>15.0</sparkle:minimumSystemVersion>
+      <sparkle:channel>beta</sparkle:channel>
+      <description>&lt;p&gt;A beta build with the newest changes.&lt;/p&gt;&lt;ul&gt;&lt;li&gt;Run Safari extensions from apps on this Mac, asking before each site&lt;/li&gt;&lt;/ul&gt;</description>
+      <enclosure url="https://github.com/mlovelace112-maker/VelaBrowser/releases/download/v1.0-beta.25/Vela-1.0-beta.25.zip" sparkle:edSignature="dd51DoSRJLhOJRvxtl8jXxWQd2sDJiHDSClT2W+aGzkaoz5cUAds0Sw8FMeSazvapuDeG0yJLL2uk9gH9S3lBA==" length="8718454" type="application/octet-stream" />
+    </item>
+    <item>
       <title>Vela 1.0-beta.24</title>
       <pubDate>Fri, 20 Nov 2026 19:30:20 GMT</pubDate>
       <sparkle:version>24</sparkle:version>
