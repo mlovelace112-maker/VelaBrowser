@@ -98,6 +98,33 @@ final class BrowserStore {
     var isCommandBarVisible = false
     var linkPreview: LinkPreview?
 
+    // Dark mode for every site (SiteTools.swift)
+    var darkModeEverywhere = DarkMode.isEnabled {
+        didSet { applyDarkModeSettings() }
+    }
+    var darkModeOffSites = DarkMode.offSites {
+        didSet { applyDarkModeSettings() }
+    }
+
+    // Focus mode (SiteTools.swift)
+    /// When the current focus session ends (.distantFuture: when you stop it).
+    var focusUntil: Date?
+    var focusSites = UserDefaults.standard.stringArray(forKey: "vela.focusSites") ?? BrowserStore.defaultFocusSites {
+        didSet { saveFocusSettings() }
+    }
+    var focusSchedule = BrowserStore.loadFocusSchedule() {
+        didSet { saveFocusSettings(); checkFocus() }
+    }
+    /// Sites you're taking a 5-minute break on, and when the break ends.
+    var focusBreaks: [String: Date] = [:]
+
+    // Web panels (SiteTools.swift)
+    var webPanels = BrowserStore.loadWebPanels()
+    var selectedPanelID: UUID?
+    var isWebPanelVisible = false
+    @ObservationIgnored var panelWebViews: [UUID: WKWebView] = [:]
+    @ObservationIgnored var panelCoordinators: [UUID: WebPanelCoordinator] = [:]
+
     // Claude
     let claude = ClaudeAssistant()
     var isClaudePanelVisible = false
@@ -232,6 +259,7 @@ final class BrowserStore {
     /// Hooks a tab up to the store: history, the shield, downloads and passwords.
     private func connect(_ tab: BrowserTab) {
         tab.settings = { [weak self] in self?.privacy ?? PrivacySettings() }
+        tab.isFocusBlocked = { [weak self] url in self?.focusBlockedSite(for: url) != nil }
         tab.checkThreat = { [weak self] url in await self?.safeBrowsing.check(url) }
         tab.onOpenInNewTab = { [weak self, weak tab] url in
             self?.newTab(url: url, opener: tab)
@@ -808,6 +836,7 @@ final class BrowserStore {
                 guard let self else { return }
                 await self.sleepIdleTabs()
                 self.archiveIdleTabs()
+                self.checkFocus()
                 self.saveSession()
             }
         }

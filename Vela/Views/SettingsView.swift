@@ -14,6 +14,8 @@ struct SettingsView: View {
                 .tabItem { Label("Security", systemImage: "lock.shield") }
             SiteSettingsList()
                 .tabItem { Label("Sites", systemImage: "globe") }
+            FocusSettingsTab()
+                .tabItem { Label("Focus", systemImage: "leaf") }
             ClaudeSettingsTab()
                 .tabItem { Label("Claude", systemImage: "sparkle") }
             SpotifySettingsTab()
@@ -159,6 +161,8 @@ struct AppearanceSettingsTab: View {
                 Toggle("Show shortcuts", isOn: $appearance.settings.showShortcuts)
                 Toggle("Show blocked trackers count", isOn: $appearance.settings.showBlockedStats)
             }
+
+            DarkModeSettingsSection()
 
             Section {
                 Button("Reset Appearance to Defaults") { appearance.reset() }
