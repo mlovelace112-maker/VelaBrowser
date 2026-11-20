@@ -223,6 +223,7 @@ struct KeyboardWatcher: View {
     var body: some View {
         Color.clear
             .frame(width: 0, height: 0)
+            .background { ExtraSheets() }
             .onAppear(perform: start)
             .onDisappear {
                 if let monitor { NSEvent.removeMonitor(monitor) }

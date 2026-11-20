@@ -168,6 +168,8 @@ struct PrivacySettingsTab: View {
                 LabeledContent("Pop-ups", value: "\(store.popupsBlockedTotal)")
             }
             EmailMaskingSection()
+            ActivitySettingsSection()
+            PageMemorySettingsSection()
             Section {
                 Text("Choices you've made for single websites (camera, microphone, pop-ups, JavaScript, sign-in, the shield) are in the Sites tab.")
                     .foregroundStyle(Nightglass.mutedText)

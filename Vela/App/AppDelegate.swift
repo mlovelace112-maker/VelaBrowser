@@ -47,6 +47,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
         // Remember your tabs for next time (Settings ▸ General ▸ Tabs).
         store.saveSession()
+        store.activity.save()
+        store.pageMemory.save()
         guard store.privacy.clearCookiesOnQuit else { return .terminateNow }
 
         // Clearing data takes a moment, so ask macOS to wait ("terminate later"),
