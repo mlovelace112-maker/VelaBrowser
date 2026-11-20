@@ -120,6 +120,7 @@ struct TabStripView: View {
     }
 }
 
+@MainActor
 extension StripItem {
     var isPinnedTab: Bool {
         switch self {
