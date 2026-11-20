@@ -86,6 +86,17 @@ final class BrowserStore {
     var tabSleepMinutes = UserDefaults.standard.object(forKey: "vela.tabSleepMinutes") as? Int ?? 30 {
         didSet { UserDefaults.standard.set(tabSleepMinutes, forKey: "vela.tabSleepMinutes") }
     }
+    /// Tabs you haven't opened for this many days close and move to
+    /// Tabs ▸ Archived Tabs (0 = never). See TabArchive.swift.
+    var archiveAfterDays = UserDefaults.standard.object(forKey: "vela.archiveAfterDays") as? Int ?? 7 {
+        didSet { UserDefaults.standard.set(archiveAfterDays, forKey: "vela.archiveAfterDays") }
+    }
+    /// Tabs Vela tidied away, newest first.
+    var archivedTabs: [ArchivedTab] = BrowserStore.loadArchivedTabs()
+
+    // Command bar (⌘K) and link previews (hold ⌥ over a link)
+    var isCommandBarVisible = false
+    var linkPreview: LinkPreview?
 
     // Claude
     let claude = ClaudeAssistant()
@@ -100,7 +111,7 @@ final class BrowserStore {
     /// "Save password?" waiting for an answer.
     var passwordPrompt: PasswordPrompt?
     /// The compiled blocking rules every tab uses.
-    @ObservationIgnored private var ruleList: WKContentRuleList?
+    @ObservationIgnored private(set) var ruleList: WKContentRuleList?
 
     /// Shared settings for every normal tab's web view.
     @ObservationIgnored let configuration: WKWebViewConfiguration
@@ -740,6 +751,9 @@ final class BrowserStore {
         var isPinned: Bool
         var groupID: UUID?
         var containerID: UUID?
+        /// When you last looked at the tab, so tab tidy-up still knows
+        /// after a restart. (Optional: older saved sessions don't have it.)
+        var lastActive: Date?
     }
 
     /// Saves your open tabs (never private ones) so the next launch can reopen them.
@@ -754,7 +768,8 @@ final class BrowserStore {
                 && ["http", "https"].contains(tab.url?.scheme?.lowercased() ?? "")
         }
         let saved = kept.compactMap { tab in
-            tab.url.map { SavedTab(url: $0, title: tab.title, isPinned: tab.isPinned, groupID: tab.groupID, containerID: tab.containerID) }
+            tab.url.map { SavedTab(url: $0, title: tab.title, isPinned: tab.isPinned, groupID: tab.groupID,
+                                   containerID: tab.containerID, lastActive: tab.lastActive) }
         }
         let usedGroups = groups.filter { group in saved.contains { $0.groupID == group.id } }
         let session = SavedSession(tabs: saved, groups: usedGroups, selected: kept.firstIndex { $0.id == selectedTabID })
@@ -777,6 +792,7 @@ final class BrowserStore {
             tab.isPinned = saved.isPinned
             tab.groupID = saved.isPinned ? nil : saved.groupID
             tab.restoreAsleep(url: saved.url, title: saved.title)
+            tab.lastActive = saved.lastActive ?? Date()
             tabs.append(tab)
         }
         removeEmptyGroups()
@@ -791,6 +807,7 @@ final class BrowserStore {
                 try? await Task.sleep(for: .seconds(60))
                 guard let self else { return }
                 await self.sleepIdleTabs()
+                self.archiveIdleTabs()
                 self.saveSession()
             }
         }
