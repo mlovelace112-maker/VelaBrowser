@@ -353,5 +353,15 @@ struct ExtraSheets: View {
                     HighlightNoteSheet(id: editing.id).environment(store)
                 }
             }
+            .background {
+                Color.clear.sheet(isPresented: $store.isWatchSheetVisible) {
+                    WatchPagesSheet().environment(store)
+                }
+            }
+            .background {
+                Color.clear.sheet(isPresented: $store.isWorkspaceSheetVisible) {
+                    SaveWorkspaceSheet().environment(store)
+                }
+            }
     }
 }

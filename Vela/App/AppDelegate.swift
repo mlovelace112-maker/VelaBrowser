@@ -1,4 +1,5 @@
 import AppKit
+import UserNotifications
 
 /// Handles app-wide events from macOS: launching and quitting.
 ///
@@ -20,6 +21,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
         // Start looking for new versions of Vela (see Updater.swift).
         Updater.shared.start()
+        // Clicking a watched-page notification opens that page.
+        UNUserNotificationCenter.current().delegate = self
         // Remind about waiting macOS security updates (WebKit gets its fixes there).
         Task { @MainActor in
             if let update = await Updater.shared.checkMacOSUpdates() {
@@ -59,5 +62,25 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             sender.reply(toApplicationShouldTerminate: true)
         }
         return .terminateLater
+    }
+}
+
+extension AppDelegate: UNUserNotificationCenterDelegate {
+    nonisolated func userNotificationCenter(_ center: UNUserNotificationCenter, didReceive response: UNNotificationResponse,
+                                            withCompletionHandler completionHandler: @escaping () -> Void) {
+        let address = response.notification.request.content.userInfo["url"] as? String
+        Task { @MainActor in
+            if let address, let url = URL(string: address) {
+                self.store.open(url, inNewTab: true)
+                NSApp.activate()
+            }
+            completionHandler()
+        }
+    }
+
+    /// Show watched-page news even while Vela is in front.
+    nonisolated func userNotificationCenter(_ center: UNUserNotificationCenter, willPresent notification: UNNotification,
+                                            withCompletionHandler completionHandler: @escaping (UNNotificationPresentationOptions) -> Void) {
+        completionHandler([.banner, .sound])
     }
 }

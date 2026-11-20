@@ -185,6 +185,14 @@ private struct PageArea: View {
             }
         }
         .animation(.easeOut(duration: 0.12), value: store.selectedTab?.hoveredLink)
+        .overlay(alignment: .bottom) {
+            if store.readAloudPlayer.state != .idle {
+                ReadAloudBar()
+                    .padding(.bottom, 16)
+                    .transition(.move(edge: .bottom).combined(with: .opacity))
+            }
+        }
+        .animation(Nightglass.spring, value: store.readAloudPlayer.state)
         .overlay(alignment: .topTrailing) {
             if let prompt = store.passwordPrompt, prompt.tabID == store.selectedTabID {
                 PasswordSaveBanner(prompt: prompt)
@@ -193,6 +201,14 @@ private struct PageArea: View {
             }
         }
         .animation(Nightglass.spring, value: store.passwordPrompt)
+        .overlay(alignment: .top) {
+            if let request = store.extensions.requests.first(where: { $0.tabID == nil || $0.tabID == store.selectedTabID }) {
+                ExtensionAccessBanner(request: request)
+                    .padding(14)
+                    .transition(.move(edge: .top).combined(with: .opacity))
+            }
+        }
+        .animation(Nightglass.spring, value: store.extensions.requests)
         .overlay(alignment: .topLeading) {
             if let tab = store.selectedTab, let request = tab.permissionRequest {
                 PermissionBanner(tab: tab, request: request)
