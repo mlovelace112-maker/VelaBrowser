@@ -91,11 +91,18 @@ final class ClaudeAssistant {
         if !messages.isEmpty { newChat() }
     }
 
+    /// True once Claude has read a web page in this chat. From then on, a
+    /// page's hidden instructions could try to make Claude send what it has
+    /// seen (from your other tabs, say) to another site by opening an address
+    /// with that data in it, so Vela asks you before Claude opens anything.
+    @ObservationIgnored var hasReadWebContent = false
+
     func newChat() {
         chatTask?.cancel()
         answerConfirmation(false)
         messages = []
         history = []
+        hasReadWebContent = false
         isWorking = false
     }
 

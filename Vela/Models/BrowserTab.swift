@@ -275,7 +275,9 @@ final class BrowserTab: Identifiable {
             return
         }
         didAutoFill = true
-        let arguments: [String: Any] = ["username": username, "password": password]
+        // The frame could have moved to another site while you used Touch ID,
+        // so the fill script checks the address again right before typing.
+        let arguments: [String: Any] = ["username": username, "password": password, "site": server]
         webView.callAsyncJavaScript(
             PasswordScripts.fillFunction, arguments: arguments, in: frame, in: .defaultClient
         ) { [weak self] result in

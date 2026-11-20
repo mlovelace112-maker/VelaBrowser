@@ -35,11 +35,25 @@ Please don't open a public issue for a security problem. Use **Security ▸ Repo
 
 | Risk | What Vela does |
 |---|---|
-| **LLM01 Prompt injection** | Page text is wrapped and labeled as untrusted, and Claude is told never to follow instructions inside it. Actions that change things need your OK. |
+| **LLM01 Prompt injection** | Page text is wrapped and labeled as untrusted, and Claude is told never to follow instructions inside it. Actions that change things need your OK. Once Claude has read a page in a chat, it must ask you before opening any address, so a page can't quietly make it send your data to another site. |
 | **LLM02 Sensitive information disclosure** | Claude never sees private tabs or pages with a password box, and only reads a page when asked. |
 | **LLM05 Improper output handling** | Claude's answers are shown as text, not run as code. Links open in new tabs and go through the link checker. |
 | **LLM06 Excessive agency** | Claude has a short, fixed list of browser tools. Closing tabs and sending forms ask first, and **Stop** cancels at any time. |
 | **LLM10 Unbounded consumption** | Each chat turn has a cap on tool steps, and your API key stays in the Keychain. |
+
+## Security review (November 2026)
+
+A review of Vela's code after the scrolling tabs, Safari extensions, read aloud, watched pages, workspaces, highlights and shortcuts were added. It looked at everything a website, an extension or Claude can reach.
+
+| Finding | Risk | Status |
+|---|---|---|
+| A web page that Claude reads could hide instructions that make Claude open an address with data from your other tabs in it, sending that data to another site. | Medium | **Fixed:** after Claude reads a page, opening any address asks you first and shows the full address. Addresses on your Mac or home network always ask. |
+| A login form inside a frame could move to another site during the Touch ID prompt, and the password would be typed into the new site. | Medium | **Fixed:** the fill script checks the frame's address (and that it's HTTPS) right before typing. |
+| Highlight notes were put into the page as tooltips, where the website's own scripts could read them. | Medium (privacy) | **Fixed:** notes stay in Vela. Only an id marks the highlighted text. |
+| An extension could silently grant itself extra features (like reading cookies or history) while running. | Low | **Fixed:** new features an extension asks for while running need your OK. |
+| A page could fake a "pop-up blocked" notice with a non-web address, which Allow Once would open. | Low | **Fixed:** Allow Once only opens `http` and `https` addresses. |
+| `main` has no branch protection yet, so a mistaken push would ship as a beta. | Low | **Waiting on the owner:** run `scripts/secure-repo.sh` once. |
+| Vela turns off macOS library validation so Sparkle loads in builds without a team ID. Releases are now signed with a real certificate, so this could be turned back on. | Low (needs someone already on your Mac) | **Open:** can be changed after testing on a Mac, since a mistake would stop Vela from launching. |
 
 ### What Vela can't do
 
