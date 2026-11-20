@@ -189,7 +189,7 @@ final class SuggestionEngine {
         components.queryItems = [URLQueryItem(name: "q", value: query), URLQueryItem(name: "type", value: "list")]
         guard let url = components.url else { return [] }
         var request = URLRequest(url: url, timeoutInterval: 3)
-        request.setValue("Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Safari/605.1.15", forHTTPHeaderField: "User-Agent")
+        request.setValue(SafariIdentity.desktop, forHTTPHeaderField: "User-Agent")
         guard let (data, _) = try? await URLSession(configuration: .ephemeral).data(for: request),
               let json = try? JSONSerialization.jsonObject(with: data) else { return [] }
         // Usually ["what you typed", ["idea 1", "idea 2", …]]

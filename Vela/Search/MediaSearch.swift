@@ -117,7 +117,7 @@ final class MediaSearch {
 /// The DuckDuckGo image and video endpoints.
 @MainActor
 enum DuckDuckGoMedia {
-    private static let userAgent = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Safari/605.1.15"
+    private static var userAgent: String { SafariIdentity.desktop }
 
     /// A cookie-free session, so searches aren't linked together.
     private static let session: URLSession = {

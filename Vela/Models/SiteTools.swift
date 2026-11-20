@@ -264,8 +264,7 @@ final class WebPanelCoordinator: NSObject, WKNavigationDelegate, WKUIDelegate {
 
 extension BrowserStore {
     /// Phone-sized pages fit the narrow panel much better.
-    private static let panelUserAgent =
-        "Mozilla/5.0 (iPhone; CPU iPhone OS 18_6 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.6 Mobile/15E148 Safari/604.1"
+    private static var panelUserAgent: String { SafariIdentity.mobile }
 
     static func loadWebPanels() -> [WebPanel] {
         guard let data = UserDefaults.standard.data(forKey: "vela.webPanels"),

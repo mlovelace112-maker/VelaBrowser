@@ -211,6 +211,7 @@ final class PageReader: NSObject, WKNavigationDelegate {
     private func read(_ url: URL, dataStore: WKWebsiteDataStore) async -> String? {
         let configuration = WKWebViewConfiguration()
         configuration.websiteDataStore = dataStore
+        configuration.applicationNameForUserAgent = SafariIdentity.applicationName
         let webView = WKWebView(frame: CGRect(x: 0, y: 0, width: 1200, height: 900), configuration: configuration)
         webView.navigationDelegate = self
         self.webView = webView

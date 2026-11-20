@@ -28,6 +28,7 @@ final class LinkPreview: Identifiable {
         let configuration = WKWebViewConfiguration()
         configuration.websiteDataStore = tab.webView.configuration.websiteDataStore
         configuration.preferences.javaScriptCanOpenWindowsAutomatically = false
+        configuration.applicationNameForUserAgent = SafariIdentity.applicationName
         if let ruleList { configuration.userContentController.add(ruleList) }
         webView = WKWebView(frame: .zero, configuration: configuration)
         webView.customUserAgent = tab.webView.customUserAgent
