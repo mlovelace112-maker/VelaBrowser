@@ -88,6 +88,7 @@ struct ToolbarView: View {
                     .help("Share")
                 }
 
+                ExtensionToolbarButtons()
                 SiteToolbarItems()
 
                 ClaudeButton()

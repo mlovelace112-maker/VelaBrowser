@@ -16,6 +16,8 @@ struct SettingsView: View {
                 .tabItem { Label("Sites", systemImage: "globe") }
             FocusSettingsTab()
                 .tabItem { Label("Focus", systemImage: "leaf") }
+            ExtensionSettingsTab()
+                .tabItem { Label("Extensions", systemImage: "puzzlepiece.extension") }
             ClaudeSettingsTab()
                 .tabItem { Label("Claude", systemImage: "sparkle") }
             SpotifySettingsTab()
