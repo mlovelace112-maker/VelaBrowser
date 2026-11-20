@@ -152,6 +152,7 @@ struct AppearanceSettingsTab: View {
             Section("Window") {
                 Toggle("Show bookmarks bar", isOn: $appearance.settings.showBookmarksBar)
                 Toggle("Compact tabs", isOn: $appearance.settings.compactTabs)
+                TabPreviewToggle()
                 Toggle("Show bookmarks button in toolbar", isOn: $appearance.settings.showBookmarksButton)
                 Toggle("Show share button in toolbar", isOn: $appearance.settings.showShareButton)
             }
@@ -259,5 +260,14 @@ struct UpdatesSection: View {
                     .fixedSize(horizontal: false, vertical: true)
             }
         }
+    }
+}
+
+/// Settings ▸ Appearance ▸ Window: page pictures when hovering over a tab.
+private struct TabPreviewToggle: View {
+    @AppStorage("vela.tabPreviews") private var showsPreviews = true
+
+    var body: some View {
+        Toggle("Show a preview when hovering over a tab", isOn: $showsPreviews)
     }
 }
