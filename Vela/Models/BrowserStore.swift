@@ -38,7 +38,10 @@ final class BrowserStore {
             if let pair = splitPair, !pair.contains(selectedTabID) { splitPair = nil }
             // Remember when you left the old tab (for tab sleeping), and
             // wake the new one if it was asleep.
-            tabs.first { $0.id == oldValue }?.lastActive = Date()
+            if let old = tabs.first(where: { $0.id == oldValue }) {
+                old.lastActive = Date()
+                old.capturePreview() // still on screen at this moment
+            }
             extensions.tabActivated(selectedTab, previous: tabs.first { $0.id == oldValue })
             if let tab = selectedTab {
                 tab.lastActive = Date()
@@ -303,6 +306,12 @@ final class BrowserStore {
             self.recordVisit(tab)
             self.rememberPage(in: tab)
             self.extensions.tabChanged(tab)
+            if tab.id == self.selectedTabID {
+                Task {
+                    try? await Task.sleep(for: .seconds(1))
+                    if tab.id == self.selectedTabID { tab.capturePreview() }
+                }
+            }
             Task { await tab.detectLanguage() }
             if tab.pendingCode != nil { Task { await self.fillPendingCode(in: tab) } }
         }
