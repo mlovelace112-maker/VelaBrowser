@@ -327,6 +327,9 @@ struct ClaudeToolsMenu: View {
             if let tab = store.selectedTab { store.checkSite(in: tab) }
         }
         .disabled(store.selectedTab?.url == nil)
+        Button("Watch This Page…") { store.isWatchSheetVisible = true }
+            .disabled(store.selectedTab?.url == nil || store.selectedTab?.isPrivate == true)
+        Button("Watched Pages") { store.isWatchSheetVisible = true }
         Divider()
         Button("Organize Bookmarks with Claude") { store.organizeBookmarks() }
             .disabled(store.isOrganizingBookmarks)

@@ -140,6 +140,12 @@ final class BrowserStore {
 
     // Claude
     let claude = ClaudeAssistant()
+    /// Watched pages and saved workspaces (WatchAndWorkspaces.swift).
+    let saved = SavedLists()
+    /// View ▸ Read Aloud.
+    let readAloudPlayer = ReadAloud()
+    var isWatchSheetVisible = false
+    var isWorkspaceSheetVisible = false
     /// Talk to Claude (⌥⌘A).
     let voice = VoiceInput()
     var isClaudePanelVisible = false
@@ -857,6 +863,7 @@ final class BrowserStore {
                 await self.sleepIdleTabs()
                 self.archiveIdleTabs()
                 self.checkFocus()
+                self.checkWatchedPages()
                 self.activity.save()
                 self.pageMemory.save()
                 self.announceWeeklyReportIfDue()
