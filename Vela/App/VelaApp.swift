@@ -156,6 +156,11 @@ struct BrowserCommands: Commands {
             Button("Bookmark All Tabs") { store.addBookmarksForAllTabs() }
         }
 
+        // Claude menu: tools that read whole pages
+        CommandMenu("Claude") {
+            ClaudeToolsMenu(store: store)
+        }
+
         // Tabs menu
         CommandMenu("Tabs") {
             Button("Show Next Tab") { store.selectAdjacentTab(forward: true) }

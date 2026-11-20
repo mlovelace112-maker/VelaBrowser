@@ -95,19 +95,88 @@ struct SidebarView: View {
 
     @ViewBuilder
     private var bookmarksList: some View {
-        let items = store.bookmarks.filter { matches($0.title, $0.url) }
+        let items = store.bookmarks.filter(matches)
+        let folders = store.bookmarkFolders
+        if store.claude.hasKey && store.bookmarks.count >= 3 && search.isEmpty {
+            organizeButton(hasFolders: !folders.isEmpty)
+        }
         if items.isEmpty {
             EmptyHint(text: search.isEmpty ? "No bookmarks yet. Click ☆ in the toolbar to add one." : "No matches.")
         }
-        ForEach(items) { bookmark in
-            SidebarRow(title: bookmark.title, url: bookmark.url, detail: BrowserStore.siteName(bookmark.url)) {
-                store.open(bookmark.url)
-            }
-            .contextMenu {
-                Button("Open in New Tab") { store.open(bookmark.url, inNewTab: true) }
-                Button("Delete Bookmark", role: .destructive) { store.removeBookmark(bookmark) }
+        if folders.isEmpty {
+            ForEach(items) { bookmarkRow($0) }
+        } else {
+            ForEach(folders + [""], id: \.self) { folder in
+                let inFolder = items.filter { ($0.folder ?? "") == folder }
+                if !inFolder.isEmpty {
+                    folderHeader(folder.isEmpty ? "Other" : folder)
+                    ForEach(inFolder) { bookmarkRow($0) }
+                }
             }
         }
+    }
+
+    private func bookmarkRow(_ bookmark: Bookmark) -> some View {
+        SidebarRow(title: bookmark.title, url: bookmark.url, detail: bookmarkDetail(bookmark)) {
+            store.open(bookmark.url)
+        }
+        .contextMenu {
+            Button("Open in New Tab") { store.open(bookmark.url, inNewTab: true) }
+            Menu("Move to Folder") {
+                ForEach(store.bookmarkFolders, id: \.self) { folder in
+                    Button(folder) { store.move(bookmark, toFolder: folder) }
+                        .disabled(bookmark.folder == folder)
+                }
+                if bookmark.folder != nil {
+                    Divider()
+                    Button("Remove from Folder") { store.move(bookmark, toFolder: nil) }
+                }
+            }
+            .disabled(store.bookmarkFolders.isEmpty)
+            Button("Delete Bookmark", role: .destructive) { store.removeBookmark(bookmark) }
+        }
+    }
+
+    private func bookmarkDetail(_ bookmark: Bookmark) -> String {
+        let site = BrowserStore.siteName(bookmark.url)
+        guard let tags = bookmark.tags, !tags.isEmpty else { return site }
+        return site + " · " + tags.joined(separator: ", ")
+    }
+
+    private func folderHeader(_ name: String) -> some View {
+        Text(name)
+            .font(.system(size: 11, weight: .semibold))
+            .foregroundStyle(Nightglass.mutedText)
+            .textCase(.uppercase)
+            .padding(.top, 10)
+            .padding(.bottom, 2)
+            .padding(.horizontal, 8)
+    }
+
+    private func organizeButton(hasFolders: Bool) -> some View {
+        Button { store.organizeBookmarks() } label: {
+            HStack(spacing: 6) {
+                if store.isOrganizingBookmarks {
+                    ProgressView().controlSize(.mini)
+                } else {
+                    Image(systemName: "sparkle")
+                }
+                Text(store.isOrganizingBookmarks ? "Claude is sorting…" : (hasFolders ? "Re-sort with Claude" : "Organize with Claude"))
+            }
+            .font(.system(size: 12, weight: .medium))
+            .foregroundStyle(Nightglass.claude)
+        }
+        .buttonStyle(.plain)
+        .disabled(store.isOrganizingBookmarks)
+        .help("Claude sorts your bookmarks into folders using only their titles and addresses")
+        .padding(.horizontal, 8)
+        .padding(.bottom, 4)
+    }
+
+    private func matches(_ bookmark: Bookmark) -> Bool {
+        matches(bookmark.title, bookmark.url)
+            || (bookmark.folder ?? "").localizedCaseInsensitiveContains(search)
+            || (bookmark.tags ?? []).contains { $0.localizedCaseInsensitiveContains(search) }
     }
 
     // MARK: Safari

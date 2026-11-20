@@ -100,6 +100,10 @@ final class BrowserStore {
     /// "What was that page?" (PageMemory.swift)
     let pageMemory = PageMemory()
     var isPageFinderVisible = false
+    /// The Claude tools sheet: compare tabs, video summary, site check.
+    var pageTool: PageToolState?
+    /// True while Claude sorts your bookmarks into folders.
+    var isOrganizingBookmarks = false
     /// A question to start the page finder with (from the command bar).
     var pageFinderQuestion = ""
 
@@ -1113,7 +1117,9 @@ final class BrowserStore {
         if let index = bookmarks.firstIndex(where: { $0.url == url }) {
             bookmarks.remove(at: index)
         } else {
-            bookmarks.append(Bookmark(title: tab.title, url: url))
+            let bookmark = Bookmark(title: tab.title, url: url)
+            bookmarks.append(bookmark)
+            fileNewBookmark(bookmark)
         }
         saveBookmarks()
     }
@@ -1145,7 +1151,7 @@ final class BrowserStore {
 
     private static let bookmarksKey = "vela.bookmarks"
 
-    private func saveBookmarks() {
+    func saveBookmarks() {
         if let data = try? JSONEncoder().encode(bookmarks) {
             UserDefaults.standard.set(data, forKey: Self.bookmarksKey)
         }
