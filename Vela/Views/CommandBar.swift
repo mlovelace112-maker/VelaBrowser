@@ -166,8 +166,9 @@ enum CommandSearch {
         if words.isEmpty {
             let tabs = store.tabs.filter { $0.id != store.selectedTabID }.prefix(6).map { tabItem($0, store: store) }
             let common = ["New Tab", "Reopen Closed Tab", "Show Claude", "Group Similar Tabs", "Full-Page Screenshot"]
-            let commands = common.compactMap { name in commands(store).first { $0.title.hasPrefix(name) } }
-            return Array(tabs) + commands
+            let all = Self.commands(store)
+            let starters = common.compactMap { name in all.first { $0.title.hasPrefix(name) } }
+            return Array(tabs) + starters
         }
 
         var results: [CommandItem] = []
