@@ -4,6 +4,16 @@
     <title>Vela</title>
     <description>Updates for the Vela browser</description>
     <item>
+      <title>Vela 1.0-beta.27</title>
+      <pubDate>Fri, 20 Nov 2026 19:39:11 GMT</pubDate>
+      <sparkle:version>27</sparkle:version>
+      <sparkle:shortVersionString>1.0-beta.27</sparkle:shortVersionString>
+      <sparkle:minimumSystemVersion>15.0</sparkle:minimumSystemVersion>
+      <sparkle:channel>beta</sparkle:channel>
+      <description>&lt;p&gt;A beta build with the newest changes.&lt;/p&gt;&lt;ul&gt;&lt;li&gt;Add highlights and notes, and custom keyboard shortcuts&lt;/li&gt;&lt;li&gt;Add read aloud, watched pages and workspaces&lt;/li&gt;&lt;/ul&gt;</description>
+      <enclosure url="https://github.com/mlovelace112-maker/VelaBrowser/releases/download/v1.0-beta.27/Vela-1.0-beta.27.zip" sparkle:edSignature="2CIE2QBf2zaUSErOQmlIwS/Vv8dwGkdC63u4mLfAxqSou325KKk+blwlbtZUOD0NGMi/K3v6HedoVDXZnLcgCw==" length="9143527" type="application/octet-stream" />
+    </item>
+    <item>
       <title>Vela 1.0-beta.25</title>
       <pubDate>Fri, 20 Nov 2026 19:35:55 GMT</pubDate>
       <sparkle:version>25</sparkle:version>
