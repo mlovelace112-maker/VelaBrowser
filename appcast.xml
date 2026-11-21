@@ -4,6 +4,16 @@
     <title>Vela</title>
     <description>Updates for the Vela browser</description>
     <item>
+      <title>Vela 1.0-beta.30</title>
+      <pubDate>Sat, 21 Nov 2026 01:51:48 GMT</pubDate>
+      <sparkle:version>30</sparkle:version>
+      <sparkle:shortVersionString>1.0-beta.30</sparkle:shortVersionString>
+      <sparkle:minimumSystemVersion>15.0</sparkle:minimumSystemVersion>
+      <sparkle:channel>beta</sparkle:channel>
+      <description>&lt;p&gt;A beta build with the newest changes.&lt;/p&gt;&lt;ul&gt;&lt;li&gt;Stretch tabs to fill the tab bar and resize with the window&lt;/li&gt;&lt;/ul&gt;</description>
+      <enclosure url="https://github.com/mlovelace112-maker/VelaBrowser/releases/download/v1.0-beta.30/Vela-1.0-beta.30.zip" sparkle:edSignature="eB3qF9UcZFnrraAjqU9HTWpmWJtN2e9Zs13CuWLxjZU/RxfoNlYfzP7x0yGcgu2KLN9VwZThtt+fLlynGQ8HDQ==" length="9161701" type="application/octet-stream" />
+    </item>
+    <item>
       <title>Vela 1.0-beta.29</title>
       <pubDate>Fri, 20 Nov 2026 20:45:20 GMT</pubDate>
       <sparkle:version>29</sparkle:version>
