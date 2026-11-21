@@ -3,7 +3,8 @@ import SwiftUI
 
 /// The row of tabs and tab groups along the top of the window.
 ///
-/// Tabs shrink as you open more, down to a readable width. Past that the row
+/// Tabs stretch to share the whole width of the window, and shrink as you
+/// open more (or make the window smaller), down to a readable width. Past that the row
 /// scrolls sideways (trackpad swipe or mouse wheel), the edges fade to show
 /// there's more, and ⌄ lists every tab. Pinned tabs always stay in view.
 struct TabStripView: View {
@@ -30,7 +31,8 @@ struct TabStripView: View {
 
             // Empty space you can drag to move the window (the title bar is hidden).
             Color.clear
-                .frame(minWidth: 60, maxWidth: .infinity, maxHeight: .infinity)
+                .frame(width: 60)
+                .frame(maxHeight: .infinity)
                 .contentShape(Rectangle())
                 .gesture(WindowDragGesture())
 
@@ -62,6 +64,7 @@ struct TabStripView: View {
                     case .group(let group):
                         GroupChip(group: group)
                             .id(group.id)
+                            .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { scroller.groupWidths[group.id] = $0 }
                             .transition(.scale(scale: 0.8).combined(with: .opacity))
                     case .tab(let tab):
                         TabChip(tab: tab, width: width)
@@ -80,7 +83,7 @@ struct TabStripView: View {
         .scrollPosition($position)
         .onScrollGeometryChange(for: CGFloat.self) { $0.contentOffset.x } action: { _, x in scroller.offset = x }
         .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { scroller.viewportWidth = $0 }
-        .frame(maxWidth: scroller.contentWidth > 0 ? scroller.contentWidth : .infinity)
+        .frame(maxWidth: .infinity) // takes all the room between pinned tabs and the drag space
         .mask { edgeFade }
         .onHover { scroller.isHovering = $0 }
     }
@@ -96,21 +99,30 @@ struct TabStripView: View {
         }
     }
 
-    /// Shares the room between tabs, but never below a readable width.
+    /// Shares all the room in the row between the tabs, so they stretch to
+    /// fill the window and resize with it, but never below a readable width
+    /// (then the row scrolls instead).
     private func tabWidth(for items: [StripItem]) -> CGFloat {
         let minimum: CGFloat = compact ? 104 : 124
-        let maximum: CGFloat = compact ? 160 : 200
         var tabCount = 0
-        var groupCount = 0
+        var groupsWidth: CGFloat = 0
         for item in items {
-            if case .tab = item { tabCount += 1 } else { groupCount += 1 }
+            switch item {
+            case .tab: tabCount += 1
+            case .group(let group): groupsWidth += (scroller.groupWidths[group.id] ?? 110) + 4
+            }
         }
-        guard tabCount > 0 else { return maximum }
-        let pinnedCount = store.tabs.filter(\.isPinned).count
-        // Window buttons, pinned tabs, group labels, +, ⌄, drag space and the group button.
-        let fixed = 90 + CGFloat(pinnedCount) * 40 + CGFloat(groupCount) * 110 + 32 + 32 + 60 + 32
-        let share = (stripWidth - fixed) / CGFloat(tabCount) - 4
-        return min(maximum, max(minimum, share))
+        guard tabCount > 0 else { return minimum }
+        // The room the scrolling row really has (measured), or a guess before the first layout.
+        var room = scroller.viewportWidth
+        if room <= 0 {
+            let pinnedCount = store.tabs.filter(\.isPinned).count
+            room = stripWidth - 90 - CGFloat(pinnedCount) * 40 - 60 - 32
+        }
+        // Less the group labels, the + button, padding and the gaps between tabs.
+        let available = room - groupsWidth - 32 - 4 - 2
+        let share = (available / CGFloat(tabCount)).rounded(.down) - 4
+        return max(minimum, share)
     }
 
     /// Mouse wheel (up and down) scrolls the tabs sideways.
@@ -138,6 +150,8 @@ final class TabScroller {
     var offset: CGFloat = 0
     var contentWidth: CGFloat = 0
     var viewportWidth: CGFloat = 0
+    /// How wide each group label is, so tabs can share the rest.
+    var groupWidths: [UUID: CGFloat] = [:]
     @ObservationIgnored var isHovering = false
     @ObservationIgnored private var monitor: Any?
 
@@ -286,7 +300,7 @@ struct TabChip: View {
         .padding(.horizontal, tab.isPinned ? 0 : 10)
         .frame(width: tab.isPinned ? 36 : width)
         .frame(minWidth: tab.isPinned ? 36 : (isVertical ? 0 : (compact ? 70 : 90)),
-               maxWidth: tab.isPinned ? 36 : (isVertical ? .infinity : (compact ? 160 : 200)))
+               maxWidth: tab.isPinned ? 36 : (isVertical || width != nil ? .infinity : (compact ? 160 : 200)))
         .frame(height: compact ? 26 : 30)
         .background(shape.fill(Color.white.opacity(isSelected ? 0.12 : (isHovering ? 0.06 : 0))))
         .overlay(shape.strokeBorder(
