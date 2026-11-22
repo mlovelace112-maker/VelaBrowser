@@ -147,9 +147,39 @@ jobs:
 
       - name: Write release notes
         env:
+          VERSION: ${{ steps.v.outputs.version }}
           PREVIOUS: ${{ steps.v.outputs.previous }}
           CHANNEL: ${{ steps.v.outputs.channel }}
         run: |
+          # A stable release uses hand-written notes from
+          # docs/release-notes/<version>.md when that file exists.
+          NOTES_FILE="docs/release-notes/$VERSION.md"
+          if [[ "$CHANNEL" == "stable" && -f "$NOTES_FILE" ]]; then
+            cp "$NOTES_FILE" build/notes.md
+            python3 - "$NOTES_FILE" <<'PY'
+          import html, sys
+          out, in_list = [], False
+          for raw in open(sys.argv[1], encoding="utf-8"):
+              line = raw.strip()
+              if line.startswith("- "):
+                  if not in_list:
+                      out.append("<ul>"); in_list = True
+                  out.append(f"<li>{html.escape(line[2:])}</li>")
+                  continue
+              if in_list:
+                  out.append("</ul>"); in_list = False
+              if line.startswith("#"):
+                  out.append(f"<h3>{html.escape(line.lstrip('#').strip())}</h3>")
+              elif line:
+                  out.append(f"<p>{html.escape(line)}</p>")
+          if in_list:
+              out.append("</ul>")
+          with open("build/notes.html", "w", encoding="utf-8") as f:
+              f.write("".join(out))
+          PY
+            cat build/notes.md
+            exit 0
+          fi
           RANGE="${PREVIOUS:+$PREVIOUS..}HEAD"
           git log --no-merges --pretty='%s' $RANGE | head -40 > "$RUNNER_TEMP/changes.txt"
           [[ -s "$RUNNER_TEMP/changes.txt" ]] || echo "Small fixes and improvements" > "$RUNNER_TEMP/changes.txt"
