@@ -19,12 +19,16 @@ struct ShieldButton: View {
     @State private var isOpen = false
 
     var body: some View {
-        let isUp = store.shieldsUp(for: tab) && store.privacy.blockingLevel != .off
+        let isUp = store.shieldsUp(for: tab)
         let count = tab.trackersFound.count
 
         Button { isOpen.toggle() } label: {
-            Image(systemName: isUp ? "shield.lefthalf.filled" : "shield.slash")
-                .foregroundStyle(isUp ? Nightglass.accent : Nightglass.mutedText)
+            // On: a filled shield with a check, in the theme color (the same
+            // picture as the panel's "Shield is on"). Off: a crossed-out shield.
+            // (The old "on" picture was a half-filled shield, which read as off.)
+            Image(systemName: isUp ? "checkmark.shield.fill" : "shield.slash")
+                .foregroundStyle(isUp ? Nightglass.accent : Nightglass.caution)
+                .contentTransition(.symbolEffect(.replace))
                 .overlay(alignment: .topTrailing) {
                     if isUp && count > 0 {
                         Text("\(count)")
@@ -40,7 +44,8 @@ struct ShieldButton: View {
                 .animation(Nightglass.spring, value: count)
         }
         .buttonStyle(IconButtonStyle())
-        .help(isUp ? "Shield: \(count) trackers blocked on this page" : "Shield is off for this site")
+        .help(isUp ? "Shield is on: \(count) trackers blocked on this page"
+              : (store.privacy.blockingLevel == .off ? "Shield is off everywhere (Blocking level: Off)" : "Shield is off for this site"))
         .accessibilityLabel(isUp ? "Privacy shield, \(count) trackers blocked" : "Privacy shield off")
         .popover(isPresented: $isOpen, arrowEdge: .bottom) {
             ShieldPopover(tab: tab)

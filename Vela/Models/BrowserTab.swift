@@ -836,8 +836,7 @@ final class TabCoordinator: NSObject, WKNavigationDelegate, WKUIDelegate, WKScri
     }
 
     private func shieldsUp(for tab: BrowserTab, _ settings: PrivacySettings) -> Bool {
-        guard let url = tab.url else { return true }
-        return !settings.shieldsDownSites.contains(BrowserStore.siteName(url))
+        settings.shieldsUp(on: tab.url.map(BrowserStore.siteName))
     }
 }
 

@@ -126,6 +126,21 @@ struct PrivacySettings: Codable, Equatable {
 
     init() {}
 
+    /// The entries in "shield off" that cover this website: the site itself
+    /// or a site it belongs to (turning it off for slack.com also covers
+    /// app.slack.com, just like the blocking rules do).
+    func shieldsDownEntries(for site: String) -> [String] {
+        let site = site.lowercased()
+        return shieldsDownSites.filter { site == $0 || site.hasSuffix("." + $0) }
+    }
+
+    /// Whether the shield is on for this website.
+    func shieldsUp(on site: String?) -> Bool {
+        guard blockingLevel != .off else { return false }
+        guard let site else { return true }
+        return shieldsDownEntries(for: site).isEmpty
+    }
+
     /// Whether this site may open pop-ups.
     func allowsPopups(on site: String?) -> Bool {
         !blockPopups || (site.map { popupAllowedSites.contains($0) } ?? false)
