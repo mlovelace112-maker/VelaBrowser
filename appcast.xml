@@ -4,6 +4,16 @@
     <title>Vela</title>
     <description>Updates for the Vela browser</description>
     <item>
+      <title>Vela 1.0-beta.33</title>
+      <pubDate>Sun, 22 Nov 2026 23:03:59 GMT</pubDate>
+      <sparkle:version>33</sparkle:version>
+      <sparkle:shortVersionString>1.0-beta.33</sparkle:shortVersionString>
+      <sparkle:minimumSystemVersion>15.0</sparkle:minimumSystemVersion>
+      <sparkle:channel>beta</sparkle:channel>
+      <description>&lt;p&gt;A beta build with the newest changes.&lt;/p&gt;&lt;ul&gt;&lt;li&gt;Check for updates automatically and explain test copies&lt;/li&gt;&lt;li&gt;Speed up launch and busy pages&lt;/li&gt;&lt;li&gt;Make the shield icon show its real state&lt;/li&gt;&lt;li&gt;Stop sites opening new tabs without permission&lt;/li&gt;&lt;li&gt;Make bank, 2FA and sign-in pages load reliably&lt;/li&gt;&lt;/ul&gt;</description>
+      <enclosure url="https://github.com/mlovelace112-maker/VelaBrowser/releases/download/v1.0-beta.33/Vela-1.0-beta.33.zip" sparkle:edSignature="3KCwRMT5CNjdGifDFdDgqeF7UpuRveatE9KfNdP3Br3trK2KXxjjw2mBJWt7G+l8gGUBe2FKFFywpyINqJj+BA==" length="9229013" type="application/octet-stream" />
+    </item>
+    <item>
       <title>Vela 1.0</title>
       <pubDate>Sun, 22 Nov 2026 16:15:18 GMT</pubDate>
       <sparkle:version>32</sparkle:version>
