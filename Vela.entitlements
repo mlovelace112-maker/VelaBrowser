@@ -14,8 +14,10 @@
 	<true/>
 	<key>com.apple.security.device.audio-input</key>
 	<true/>
-	<!-- Builds signed "to run locally" have no team ID, so macOS would refuse
-	     to load the Sparkle updater framework into Vela without this. -->
+	<!-- Builds signed "to run locally" (like ones you make in Xcode) have no
+	     team ID, so macOS would refuse to load the Sparkle updater framework
+	     into Vela without this. Releases signed with your certificate leave it
+	     out (scripts/sign-app.sh removes it), so library validation stays on. -->
 	<key>com.apple.security.cs.disable-library-validation</key>
 	<true/>
 </dict>
