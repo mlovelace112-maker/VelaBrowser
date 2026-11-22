@@ -552,6 +552,90 @@ final class TabCoordinator: NSObject, WKNavigationDelegate, WKUIDelegate, WKScri
         tab?.onCloseRequested?()
     }
 
+    // MARK: File picker and page dialogs
+    //
+    // WebKit doesn't show these by itself: the browser has to. Without them,
+    // "Choose File" / "Upload" buttons did nothing, and pages' alert(),
+    // confirm() ("Are you sure?") and prompt() boxes were silently skipped.
+
+    /// A page's "Choose File" / upload button: shows the Mac's file picker
+    /// as a sheet on Vela's window.
+    func webView(
+        _ webView: WKWebView,
+        runOpenPanelWith parameters: WKOpenPanelParameters,
+        initiatedByFrame frame: WKFrameInfo
+    ) async -> [URL]? {
+        let panel = NSOpenPanel()
+        panel.canChooseFiles = true
+        panel.canChooseDirectories = parameters.allowsDirectories
+        panel.allowsMultipleSelection = parameters.allowsMultipleSelection
+        panel.resolvesAliases = true
+        panel.prompt = "Choose"
+        panel.message = "Choose a file to send to \(frame.securityOrigin.host)"
+        let response: NSApplication.ModalResponse
+        if let window = webView.window {
+            response = await panel.beginSheetModal(for: window)
+        } else {
+            response = panel.runModal()
+        }
+        return response == .OK ? panel.urls : nil
+    }
+
+    func webView(
+        _ webView: WKWebView,
+        runJavaScriptAlertPanelWithMessage message: String,
+        initiatedByFrame frame: WKFrameInfo
+    ) async {
+        let alert = Self.pageAlert(message, from: frame)
+        alert.addButton(withTitle: "OK")
+        _ = await Self.show(alert, on: webView)
+    }
+
+    func webView(
+        _ webView: WKWebView,
+        runJavaScriptConfirmPanelWithMessage message: String,
+        initiatedByFrame frame: WKFrameInfo
+    ) async -> Bool {
+        let alert = Self.pageAlert(message, from: frame)
+        alert.addButton(withTitle: "OK")
+        alert.addButton(withTitle: "Cancel")
+        return await Self.show(alert, on: webView) == .alertFirstButtonReturn
+    }
+
+    func webView(
+        _ webView: WKWebView,
+        runJavaScriptTextInputPanelWithPrompt prompt: String,
+        defaultText: String?,
+        initiatedByFrame frame: WKFrameInfo
+    ) async -> String? {
+        let alert = Self.pageAlert(prompt, from: frame)
+        let field = NSTextField(frame: NSRect(x: 0, y: 0, width: 280, height: 24))
+        field.stringValue = defaultText ?? ""
+        alert.accessoryView = field
+        alert.addButton(withTitle: "OK")
+        alert.addButton(withTitle: "Cancel")
+        alert.window.initialFirstResponder = field
+        return await Self.show(alert, on: webView) == .alertFirstButtonReturn ? field.stringValue : nil
+    }
+
+    /// A dialog that says which website is asking, so a page can't pretend
+    /// to be Vela or another site.
+    private static func pageAlert(_ message: String, from frame: WKFrameInfo) -> NSAlert {
+        let alert = NSAlert()
+        let host = frame.securityOrigin.host
+        alert.messageText = host.isEmpty ? "This page says" : "\(host) says"
+        alert.informativeText = String(message.prefix(2000))
+        alert.alertStyle = .informational
+        return alert
+    }
+
+    private static func show(_ alert: NSAlert, on webView: WKWebView) async -> NSApplication.ModalResponse {
+        if let window = webView.window {
+            return await alert.beginSheetModal(for: window)
+        }
+        return alert.runModal()
+    }
+
     // MARK: Navigation decisions
 
     /// Asked before every page (and frame) loads. This is where JavaScript gets
