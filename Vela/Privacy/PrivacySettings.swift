@@ -163,6 +163,7 @@ struct PrivacySettings: Codable, Equatable {
             blockInterstitialAds: blockInterstitialAds,
             blockEmbeddedAds: blockEmbeddedAds,
             shieldsDownSites: shieldsDownSites,
+            signInSites: signInSites,
             fingerprintProtection: fingerprintProtection,
             globalPrivacyControl: globalPrivacyControl,
             dismissCookieBanners: dismissCookieBanners
@@ -175,6 +176,7 @@ struct PrivacySettings: Codable, Equatable {
         let blockInterstitialAds: Bool
         let blockEmbeddedAds: Bool
         let shieldsDownSites: Set<String>
+        let signInSites: Set<String>
         let fingerprintProtection: Bool
         let globalPrivacyControl: Bool
         let dismissCookieBanners: Bool

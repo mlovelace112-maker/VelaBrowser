@@ -12,17 +12,39 @@ import WebKit
 /// **What Vela does:** it changes the answers very slightly. Canvas pixels
 /// and audio samples get invisible noise, and hardware details report common
 /// values. The noise is the same every time on one website (so sites keep
-/// working), but different on every other website and every time Vela
-/// starts, so the answers can't be matched up across sites or days.
+/// working), and different on every other website, so the answers can't be
+/// matched up across sites.
+///
+/// **Banks and two-factor sign-ins:** these sites remember "this is your
+/// Mac" partly from these same answers. The noise used to change every time
+/// Vela started, so to your bank you looked like a brand-new device each day:
+/// it asked for a code again, or refused the login as suspicious. Now the
+/// noise stays the same for each website (until you reset it), and sign-in
+/// services plus sites where you chose "Allow Sign-In" get your Mac's real
+/// answers.
 ///
 /// WebKit already hides some things for us: it only reports system fonts,
 /// rounds timers, and doesn't offer the battery or device-sensor APIs.
 enum Fingerprinting {
-    /// Changes every launch, so your fingerprint changes every launch too.
-    private static let sessionSeed = UInt32.random(in: 1...UInt32.max)
+    /// Picked once and saved, so each website sees the same (slightly
+    /// changed) answers every day and trusts your Mac as a known device.
+    /// Each website still gets different answers from every other one.
+    private static let seed: UInt32 = {
+        let key = "vela.fingerprintSeed"
+        let saved = UInt32(truncatingIfNeeded: UserDefaults.standard.integer(forKey: key))
+        if saved != 0 { return saved }
+        let fresh = UInt32.random(in: 1...UInt32.max)
+        UserDefaults.standard.set(Int(fresh), forKey: key)
+        return fresh
+    }()
 
-    static func script(shieldsDownSites: Set<String>) -> WKUserScript {
-        let sites = (try? JSONEncoder().encode(shieldsDownSites.sorted()))
+    /// - Parameters:
+    ///   - shieldsDownSites: sites where you turned the shield off.
+    ///   - signInSites: sites where you chose "Allow Sign-In". They, and the
+    ///     big sign-in services, get your Mac's real answers.
+    static func script(shieldsDownSites: Set<String>, signInSites: Set<String> = []) -> WKUserScript {
+        let exempt = shieldsDownSites.union(signInSites).union(ContentBlocker.signInDomains)
+        let sites = (try? JSONEncoder().encode(exempt.sorted()))
             .flatMap { String(data: $0, encoding: .utf8) } ?? "[]"
         let source = """
         (() => {
@@ -32,8 +54,8 @@ enum Fingerprinting {
           const shieldsDown = \(sites);
           if (shieldsDown.some((s) => host === s || host.endsWith('.' + s))) return;
 
-          // A number made from this launch's seed and the website's name.
-          let seed = \(sessionSeed) >>> 0;
+          // A number made from Vela's saved seed and the website's name.
+          let seed = \(seed) >>> 0;
           const site = host.split('.').slice(-2).join('.');
           for (let i = 0; i < site.length; i++) seed = (Math.imul(seed ^ site.charCodeAt(i), 2654435761) >>> 0) || 1;
           // A small random-number generator that always starts from that seed,

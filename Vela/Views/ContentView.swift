@@ -173,6 +173,9 @@ private struct PageArea: View {
                     } else if let insecure = tab.httpsWarning {
                         HTTPSWarningView(tab: tab, url: insecure)
                             .transition(.opacity)
+                    } else if let failure = tab.loadError {
+                        LoadErrorView(tab: tab, failure: failure)
+                            .transition(.opacity)
                     }
                 }
             }

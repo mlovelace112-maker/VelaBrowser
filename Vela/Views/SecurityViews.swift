@@ -162,6 +162,54 @@ struct HTTPSWarningView: View {
     }
 }
 
+/// "This page didn't load", with what went wrong and a Try Again button.
+struct LoadErrorView: View {
+    let tab: BrowserTab
+    let failure: LoadError
+
+    var body: some View {
+        ZStack {
+            NightglassBackdrop()
+            VStack(alignment: .leading, spacing: 16) {
+                Image(systemName: "wifi.exclamationmark")
+                    .font(.system(size: 30, weight: .semibold))
+                    .foregroundStyle(Nightglass.caution)
+                    .accessibilityHidden(true)
+                Text(failure.title)
+                    .font(.system(size: 22, weight: .semibold, design: .rounded))
+                    .fixedSize(horizontal: false, vertical: true)
+                Text(failure.detail)
+                    .font(.system(size: 13))
+                    .foregroundStyle(Nightglass.text)
+                    .fixedSize(horizontal: false, vertical: true)
+                HStack(spacing: 12) {
+                    Button("Try Again") { tab.retryAfterError() }
+                        .buttonStyle(.borderedProminent)
+                        .tint(Nightglass.accent)
+                        .keyboardShortcut(.defaultAction)
+                    if tab.canGoBack {
+                        Button("Go Back") {
+                            tab.loadError = nil
+                            tab.webView.goBack()
+                        }
+                        .buttonStyle(.plain)
+                        .foregroundStyle(Nightglass.secondaryText)
+                    }
+                }
+                .padding(.top, 4)
+                Text("Error \(failure.code)")
+                    .font(.system(size: 11, design: .monospaced))
+                    .foregroundStyle(Nightglass.mutedText)
+                    .textSelection(.enabled)
+            }
+            .padding(28)
+            .frame(maxWidth: 520, alignment: .leading)
+            .glassPanel(cornerRadius: 18)
+            .shadow(color: .black.opacity(0.5), radius: 30, y: 12)
+        }
+    }
+}
+
 // MARK: - Downloads
 
 /// The toolbar's downloads button, with a ring that fills as files download.
