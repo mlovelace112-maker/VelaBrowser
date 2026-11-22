@@ -262,6 +262,9 @@ struct UpdatesSection: View {
                 Text(reason)
                     .foregroundStyle(Nightglass.mutedText)
                     .fixedSize(horizontal: false, vertical: true)
+                if updater.installedCopy != nil {
+                    Button("Open Installed Vela") { updater.switchToInstalledCopy() }
+                }
             }
         }
     }

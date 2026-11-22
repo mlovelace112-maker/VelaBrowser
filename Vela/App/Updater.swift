@@ -77,7 +77,9 @@ final class Updater: NSObject, SPUUpdaterDelegate {
     func start() {
         #if DEBUG
         // A copy run from Xcode would otherwise offer to replace itself.
-        unavailableReason = "Updates are off in copies run from Xcode."
+        unavailableReason = installedCopy != nil
+            ? "This is a test copy built with Xcode, so it doesn't update itself. Your installed Vela (in Applications) checks for updates automatically. Quit this copy and open that one."
+            : "This is a test copy built with Xcode, so it doesn't update itself. Install Vela from the latest release (the .dmg) to get automatic updates."
         #else
         // The public key is 32 bytes written as 44 characters of Base64. Until
         // `scripts/setup-updates.sh` has filled it in, there's nothing to check
@@ -93,7 +95,26 @@ final class Updater: NSObject, SPUUpdaterDelegate {
             userDriverDelegate: nil
         )
         self.controller = controller
-        checksAutomatically = controller.updater.automaticallyChecksForUpdates
+        let updater = controller.updater
+        // Check for updates by itself: switched on once for everyone (you can
+        // still turn it off in Settings afterwards), and every 6 hours
+        // instead of Sparkle's usual once a day.
+        let checkKey = "vela.updates.autoCheckChosen"
+        if !UserDefaults.standard.bool(forKey: checkKey) {
+            updater.automaticallyChecksForUpdates = true
+            UserDefaults.standard.set(true, forKey: checkKey)
+        }
+        updater.updateCheckInterval = 6 * 60 * 60
+        checksAutomatically = updater.automaticallyChecksForUpdates
+        // Also look shortly after Vela opens, if it's been over an hour,
+        // so a Mac that sleeps a lot still hears about fixes quickly.
+        if checksAutomatically,
+           Date().timeIntervalSince(updater.lastUpdateCheckDate ?? .distantPast) > 60 * 60 {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 5) { [weak updater] in
+                guard let updater, updater.automaticallyChecksForUpdates, !updater.sessionInProgress else { return }
+                updater.checkForUpdatesInBackground()
+            }
+        }
         // Install updates automatically unless you've turned that off.
         let autoKey = "vela.updates.autoInstallChosen"
         if !UserDefaults.standard.bool(forKey: autoKey) {
@@ -126,6 +147,24 @@ final class Updater: NSObject, SPUUpdaterDelegate {
         }.value
         await MainActor.run { pendingMacOSUpdate = found }
         return found
+    }
+
+    /// The Vela installed in Applications, when this isn't it.
+    var installedCopy: URL? {
+        let installed = URL(fileURLWithPath: "/Applications/Vela.app")
+        guard FileManager.default.fileExists(atPath: installed.path),
+              installed.resolvingSymlinksInPath() != Bundle.main.bundleURL.resolvingSymlinksInPath() else { return nil }
+        return installed
+    }
+
+    /// Opens the installed Vela and quits this test copy.
+    func switchToInstalledCopy() {
+        guard let installed = installedCopy else { return }
+        let configuration = NSWorkspace.OpenConfiguration()
+        configuration.createsNewApplicationInstance = true
+        NSWorkspace.shared.openApplication(at: installed, configuration: configuration) { _, error in
+            if error == nil { DispatchQueue.main.async { NSApp.terminate(nil) } }
+        }
     }
 
     /// Opens System Settings ▸ General ▸ Software Update.

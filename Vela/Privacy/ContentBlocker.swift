@@ -1,3 +1,4 @@
+import CryptoKit
 import Foundation
 import WebKit
 
@@ -26,14 +27,23 @@ enum ContentBlocker {
         return await compile(makeRules(for: settings, includeHidingRules: false))
     }
 
+    /// Compiling the rules takes WebKit a moment, and Vela used to do it on
+    /// every launch before showing your first page. Now each set of rules is
+    /// saved under a name made from its contents: if your settings haven't
+    /// changed since last time, the saved copy opens instantly.
     private static func compile(_ rules: [[String: Any]]) async -> WKContentRuleList? {
         guard !rules.isEmpty,
-              let data = try? JSONSerialization.data(withJSONObject: rules),
+              let data = try? JSONSerialization.data(withJSONObject: rules, options: [.sortedKeys]),
               let json = String(data: data, encoding: .utf8) else { return nil }
+        let digest = SHA256.hash(data: data).prefix(12).map { String(format: "%02x", $0) }.joined()
+        let identifier = "\(ruleListID).\(digest)"
+        let store = WKContentRuleListStore.default()!
 
-        return await withCheckedContinuation { (continuation: CheckedContinuation<WKContentRuleList?, Never>) in
-            WKContentRuleListStore.default().compileContentRuleList(
-                forIdentifier: ruleListID,
+        if let saved = await lookUp(identifier, in: store) { return saved }
+
+        let compiled = await withCheckedContinuation { (continuation: CheckedContinuation<WKContentRuleList?, Never>) in
+            store.compileContentRuleList(
+                forIdentifier: identifier,
                 encodedContentRuleList: json
             ) { ruleList, error in
                 if let error {
@@ -41,6 +51,35 @@ enum ContentBlocker {
                 }
                 continuation.resume(returning: ruleList)
             }
+        }
+        if compiled != nil { await removeOldRuleLists(keeping: identifier, in: store) }
+        return compiled
+    }
+
+    private static func lookUp(_ identifier: String, in store: WKContentRuleListStore) async -> WKContentRuleList? {
+        await withCheckedContinuation { (continuation: CheckedContinuation<WKContentRuleList?, Never>) in
+            store.lookUpContentRuleList(forIdentifier: identifier) { ruleList, _ in
+                continuation.resume(returning: ruleList)
+            }
+        }
+    }
+
+    /// Deletes rule sets saved for older settings, so they don't pile up.
+    /// (Keeps the last few, so flipping a setting back and forth stays quick.)
+    private static func removeOldRuleLists(keeping current: String, in store: WKContentRuleListStore) async {
+        let key = "vela.recentRuleLists"
+        var recent = UserDefaults.standard.stringArray(forKey: key) ?? []
+        recent.removeAll { $0 == current }
+        recent.insert(current, at: 0)
+        recent = Array(recent.prefix(4))
+        UserDefaults.standard.set(recent, forKey: key)
+
+        let identifiers = await withCheckedContinuation { (continuation: CheckedContinuation<[String], Never>) in
+            store.getAvailableContentRuleListIdentifiers { continuation.resume(returning: $0 ?? []) }
+        }
+        for identifier in identifiers
+        where (identifier == ruleListID || identifier.hasPrefix(ruleListID + ".")) && !recent.contains(identifier) {
+            store.removeContentRuleList(forIdentifier: identifier) { _ in }
         }
     }
 
@@ -222,43 +261,71 @@ enum ContentBlocker {
 
     /// Runs at the start of every page and frame. Pages open pop-ups with
     /// `window.open`. WebKit already blocks the ones you didn't click for; this
-    /// notices when that happens so Vela can show "Pop-up blocked · Allow once".
+    /// notices when that happens so Vela can show "Pop-up blocked · Allow".
+    ///
+    /// **New tabs only when you ask:** with "Block pop-ups" on, a page can
+    /// only open a new tab when you clicked a real link or button. A click on
+    /// an empty part of the page, or a link the page "clicks" by itself, no
+    /// longer opens a tab. Sites in your allowed list are left alone.
     ///
     /// **Pop-unders** are sneakier: the page waits for you to click *anywhere*
     /// (so it counts as "you clicked"), then opens an ad tab. With pop-under
     /// protection on, a click that wasn't on a link or button can't open a tab
-    /// to a different website.
-    static func popupGuardScript(popUnderProtection: Bool, shieldsDownSites: Set<String>) -> WKUserScript {
+    /// to a different website (even on sites allowed to open pop-ups).
+    static func popupGuardScript(
+        popUnderProtection: Bool,
+        blockNewTabs: Bool = true,
+        allowedSites: Set<String> = [],
+        shieldsDownSites: Set<String>
+    ) -> WKUserScript {
         let source = """
         (() => {
           if (window.__velaPopupGuard) return;
           window.__velaPopupGuard = true;
           const shieldsDown = \(jsonArray(shieldsDownSites.sorted()));
+          const allowed = \(jsonArray(allowedSites.sorted()));
           const host = location.hostname;
-          const shieldOff = shieldsDown.some((s) => host === s || host.endsWith('.' + s));
+          let topHost = host;
+          try { topHost = window.top.location.hostname || host; } catch (e) {}
+          const matches = (list, h) => list.some((s) => h === s || h.endsWith('.' + s));
+          const shieldOff = matches(shieldsDown, host);
           const POPUNDER = \(popUnderProtection) && !shieldOff;
+          const ASK = \(blockNewTabs) && !matches(allowed, topHost.replace(/^www\\./, ''));
           const post = (message) => {
             try { window.webkit.messageHandlers.\(messageName).postMessage(message); } catch (e) {}
           };
+          const CONTROLS = 'a[href], button, input, select, textarea, label, summary, [role="button"], [role="link"], [role="menuitem"], [role="tab"]';
           let lastClick = null;
-          document.addEventListener('click', (e) => { lastClick = { target: e.target, time: Date.now() }; }, true);
+          document.addEventListener('click', (e) => {
+            if (e.isTrusted) { lastClick = { target: e.target, time: Date.now() }; return; }
+            // A link the page "clicked" by itself to open a new tab.
+            if (!ASK) return;
+            const link = e.target && e.target.closest ? e.target.closest('a[href]') : null;
+            const target = link ? (link.getAttribute('target') || '').toLowerCase() : '';
+            if (link && target && !['_self', '_parent', '_top'].includes(target)) {
+              e.preventDefault();
+              e.stopImmediatePropagation();
+              post({ type: 'popup', url: link.href, popunder: false });
+            }
+          }, true);
           const siteOf = (h) => h.replace(/^www\\./, '');
           const original = window.open;
           window.open = function (url, ...rest) {
             const clicked = navigator.userActivation ? navigator.userActivation.isActive : true;
             let href = '';
             try { href = url ? new URL(url, location.href).href : ''; } catch (e) {}
-            if (POPUNDER && clicked && href) {
-              const recent = lastClick && Date.now() - lastClick.time < 1500 ? lastClick.target : null;
-              const control = recent && recent.closest
-                ? recent.closest('a[href], button, input, select, textarea, label, summary, [role="button"], [role="link"], [role="menuitem"], [role="tab"]')
-                : null;
-              let otherSite = true;
-              try { otherSite = siteOf(new URL(href).hostname) !== siteOf(host); } catch (e) {}
-              if (!control && otherSite) {
-                post({ type: 'popup', url: href, popunder: true });
-                return null;
-              }
+            const recent = lastClick && Date.now() - lastClick.time < 1500 ? lastClick.target : null;
+            const control = recent && recent.closest ? recent.closest(CONTROLS) : null;
+            let otherSite = true;
+            try { otherSite = siteOf(new URL(href).hostname) !== siteOf(host); } catch (e) {}
+            if (POPUNDER && clicked && href && !control && otherSite) {
+              post({ type: 'popup', url: href, popunder: true });
+              return null;
+            }
+            // Opened without you clicking a real link or button.
+            if (ASK && (!clicked || !control)) {
+              post({ type: 'popup', url: href, popunder: false });
+              return null;
             }
             const opened = original.call(window, url, ...rest);
             if (!opened && !clicked) {
@@ -338,9 +405,24 @@ enum ContentBlocker {
             try { clean(); if (EMBEDDED) hideAdFrames(); } catch (e) {}
           };
           run();
+          // Only look again when something that could be an ad overlay or an
+          // ad frame was added (a new top-level box, or a frame). Busy pages
+          // change all the time; re-measuring the whole page after every
+          // change made them sluggish.
           let timer = null;
-          new MutationObserver(() => {
-            if (!timer) timer = setTimeout(() => { timer = null; run(); }, 800);
+          const body = () => document.body;
+          new MutationObserver((mutations) => {
+            if (timer) return;
+            const relevant = mutations.some((m) => {
+              const b = body();
+              if (m.target === b || (b && m.target.parentNode === b)) return m.addedNodes.length > 0;
+              if (!EMBEDDED) return false;
+              for (const n of m.addedNodes) {
+                if (n.nodeType === 1 && (n.tagName === 'IFRAME' || (n.firstElementChild && n.querySelector('iframe')))) return true;
+              }
+              return false;
+            });
+            if (relevant) timer = setTimeout(() => { timer = null; run(); }, 800);
           }).observe(document.documentElement, { childList: true, subtree: true });
         })();
         """
@@ -358,35 +440,52 @@ enum ContentBlocker {
     /// only reports *which* trackers the page tried to load, for the shield's count.
     static func trackerScanScript() -> WKUserScript {
         let list = jsonArray(trackerDomains)
+        // Fast version: the tracker list is a Set (one lookup per piece of
+        // the address instead of comparing against ~200 names), each address
+        // is only checked once, and after the first pass only newly added
+        // elements are looked at, not the whole page again.
         let source = """
         (() => {
           if (window.__velaShieldScan) return;
           window.__velaShieldScan = true;
-          const domains = \(list);
-          const seen = new Set();
+          const domains = new Set(\(list));
+          const reported = new Set();
+          const checked = new Set();
+          const SELECTOR = 'script[src], img[src], iframe[src], link[rel~="preload"][href], link[rel~="prefetch"][href]';
           const check = (value) => {
-            if (!value) return;
+            if (!value || checked.has(value)) return;
+            checked.add(value);
             let host;
             try { host = new URL(value, location.href).hostname; } catch (e) { return; }
             if (!host || host === location.hostname) return;
-            for (const d of domains) {
-              if (host === d || host.endsWith('.' + d)) {
-                if (!seen.has(d)) {
-                  seen.add(d);
+            const parts = host.split('.');
+            for (let i = 0; i < parts.length - 1; i++) {
+              const d = parts.slice(i).join('.');
+              if (domains.has(d)) {
+                if (!reported.has(d)) {
+                  reported.add(d);
                   try { window.webkit.messageHandlers.\(messageName).postMessage({ type: 'tracker', domain: d }); } catch (e) {}
                 }
                 return;
               }
             }
           };
-          const scan = () => {
-            document.querySelectorAll('script[src], img[src], iframe[src], link[rel~="preload"][href], link[rel~="prefetch"][href]')
-              .forEach((el) => check(el.getAttribute('src') || el.getAttribute('href')));
-          };
+          const checkElement = (el) => check(el.getAttribute('src') || el.getAttribute('href'));
+          document.querySelectorAll(SELECTOR).forEach(checkElement);
+          let pending = [];
           let timer = null;
-          scan();
-          new MutationObserver(() => {
-            if (!timer) timer = setTimeout(() => { timer = null; scan(); }, 500);
+          new MutationObserver((mutations) => {
+            for (const m of mutations) for (const node of m.addedNodes) if (node.nodeType === 1) pending.push(node);
+            if (timer || !pending.length) return;
+            timer = setTimeout(() => {
+              timer = null;
+              const nodes = pending; pending = [];
+              for (const node of nodes) {
+                if (!node.isConnected) continue;
+                if (node.matches && node.matches(SELECTOR)) checkElement(node);
+                if (node.firstElementChild) node.querySelectorAll(SELECTOR).forEach(checkElement);
+              }
+            }, 500);
           }).observe(document.documentElement, { childList: true, subtree: true });
         })();
         """

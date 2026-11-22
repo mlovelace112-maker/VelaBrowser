@@ -65,8 +65,10 @@ private struct SiteSection: View {
             } label: {
                 Label("JavaScript", systemImage: "curlybraces")
             }
-            toggle("Shield on", icon: "checkmark.shield", isOn: !privacy.shieldsDownSites.contains(site)) { on in
-                store.updatePrivacy { if on { $0.shieldsDownSites.remove(site) } else { $0.shieldsDownSites.insert(site) } }
+            toggle("Shield on", icon: "checkmark.shield", isOn: privacy.shieldsDownEntries(for: site).isEmpty) { on in
+                store.updatePrivacy {
+                    if on { $0.shieldsDownSites.subtract($0.shieldsDownEntries(for: site)) } else { $0.shieldsDownSites.insert(site) }
+                }
             }
             toggle("Lockdown Mode", icon: "lock.shield", isOn: privacy.lockdownSites.contains(site)) { on in
                 store.updatePrivacy { if on { $0.lockdownSites.insert(site) } else { $0.lockdownSites.remove(site) } }

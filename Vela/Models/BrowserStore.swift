@@ -930,9 +930,11 @@ final class BrowserStore {
 
     var sleepingTabCount: Int { tabs.filter(\.isAsleep).count }
 
+    /// Whether the shield is protecting this tab right now: blocking is on
+    /// in Settings, and you haven't turned it off for this website (or the
+    /// website it belongs to).
     func shieldsUp(for tab: BrowserTab) -> Bool {
-        guard let url = tab.url else { return true }
-        return !privacy.shieldsDownSites.contains(Self.siteName(url))
+        privacy.shieldsUp(on: tab.url.map(Self.siteName))
     }
 
     /// Turns the shield off (or back on) for the tab's website, then reloads it.
@@ -940,10 +942,14 @@ final class BrowserStore {
         guard let url = tab.url else { return }
         let site = Self.siteName(url)
         updatePrivacy(reloading: tab) { settings in
-            if settings.shieldsDownSites.contains(site) {
-                settings.shieldsDownSites.remove(site)
-            } else {
+            if settings.shieldsUp(on: site) {
                 settings.shieldsDownSites.insert(site)
+            } else {
+                // Back on: also clear an entry for the site it belongs to.
+                settings.shieldsDownSites.subtract(settings.shieldsDownEntries(for: site))
+                // The switch means "on for this site", so if blocking was
+                // off everywhere (Settings), turning it on starts it again.
+                if settings.blockingLevel == .off { settings.blockingLevel = .standard }
             }
         }
     }
@@ -1017,8 +1023,7 @@ final class BrowserStore {
     }
 
     private func recordTracker(_ domain: String, in tab: BrowserTab) {
-        guard privacy.blockingLevel != .off, shieldsUp(for: tab),
-              !tab.trackersFound.contains(domain) else { return }
+        guard shieldsUp(for: tab), !tab.trackersFound.contains(domain) else { return }
         tab.trackersFound.append(domain)
         trackersBlockedTotal += 1
         if !tab.isPrivate { activity.recordTrackerBlocked() }
@@ -1032,7 +1037,7 @@ final class BrowserStore {
         if !tab.isPrivate { activity.recordPopupBlocked() }
         UserDefaults.standard.set(popupsBlockedTotal, forKey: "vela.popupsBlockedTotal")
 
-        let popup = BlockedPopup(tabID: tab.id, url: url, isPopUnder: isPopUnder)
+        let popup = BlockedPopup(tabID: tab.id, url: url, isPopUnder: isPopUnder, site: tab.url.map(Self.siteName))
         blockedPopup = popup
         // Hide the notice after a few seconds.
         Task { [weak self] in
@@ -1052,6 +1057,14 @@ final class BrowserStore {
         let opener = tabs.first { $0.id == popup.tabID }
         newTab(url: url, opener: opener)
         blockedPopup = nil
+    }
+
+    /// "Always allow": this website may open new tabs and pop-ups from now
+    /// on (undo it in Site Settings), and the one just blocked opens now.
+    func alwaysAllowBlockedPopups() {
+        guard let popup = blockedPopup, let site = popup.site else { return }
+        setPopupsAllowed(true, for: site)
+        allowBlockedPopup()
     }
 
     // MARK: - Passwords

@@ -44,6 +44,9 @@ final class BrowserTab: Identifiable {
     var httpsWarning: URL?
     /// Set when focus mode stopped this page from opening (the "Stay focused" screen).
     var focusBlocked: URL?
+    /// Set when a page couldn't load (no connection, a security problem, the
+    /// site didn't answer). Shows "This page didn't load · Try Again".
+    var loadError: LoadError?
     /// Asks the store whether focus mode blocks an address right now.
     @ObservationIgnored var isFocusBlocked: ((URL) -> Bool)?
     /// Shows the list of saved logins under the key button.
@@ -126,6 +129,9 @@ final class BrowserTab: Identifiable {
     @ObservationIgnored var pendingCode: PendingCode?
     /// Dangerous links you chose to open anyway.
     @ObservationIgnored fileprivate var allowedDangerousURLs: Set<URL> = []
+    /// The address Vela already retried once by itself after a hiccup, so a
+    /// page that keeps failing shows the error instead of retrying forever.
+    @ObservationIgnored fileprivate var retriedURL: URL?
 
     private let coordinator: TabCoordinator
     private let contentController: WKUserContentController
@@ -202,6 +208,7 @@ final class BrowserTab: Identifiable {
 
     func load(_ url: URL) {
         isAsleep = false
+        loadError = nil
         if focusBlocked != url { focusBlocked = nil }
         mediaSearch = nil
         reader = nil
@@ -227,6 +234,8 @@ final class BrowserTab: Identifiable {
         contentController.removeAllUserScripts()
         contentController.addUserScript(ContentBlocker.popupGuardScript(
             popUnderProtection: privacy.blockingLevel != .off && privacy.popUnderProtection,
+            blockNewTabs: privacy.blockPopups,
+            allowedSites: privacy.popupAllowedSites,
             shieldsDownSites: privacy.shieldsDownSites
         ))
         contentController.addUserScript(ContentBlocker.trackerScanScript())
@@ -238,7 +247,7 @@ final class BrowserTab: Identifiable {
         contentController.addUserScript(DarkMode.script())
         contentController.addUserScript(PasswordScripts.loginScript())
         if privacy.fingerprintProtection {
-            contentController.addUserScript(Fingerprinting.script(shieldsDownSites: privacy.shieldsDownSites))
+            contentController.addUserScript(Fingerprinting.script(shieldsDownSites: privacy.shieldsDownSites, signInSites: privacy.signInSites))
         }
         if privacy.globalPrivacyControl {
             contentController.addUserScript(GlobalPrivacyControl.script())
@@ -303,6 +312,14 @@ final class BrowserTab: Identifiable {
     }
 
     // MARK: Sleeping tabs
+
+    /// "Try Again" on the "This page didn't load" screen.
+    func retryAfterError() {
+        guard let failed = loadError?.url else { return }
+        loadError = nil
+        retriedURL = nil
+        webView.load(URLRequest(url: failed))
+    }
 
     /// Unloads the page to free memory, keeping its address and title.
     func sleep() {
@@ -494,6 +511,15 @@ final class TabCoordinator: NSObject, WKNavigationDelegate, WKUIDelegate, WKScri
             tab.onPopupBlocked?(url, true)
             return nil
         }
+        // A page may open a new tab or window only right after you clicked
+        // or pressed a key in it. Tabs a site opens by itself (on a timer,
+        // when the page loads, or seconds after a click) are stopped, and
+        // the "New tab blocked" notice lets you allow it once or always.
+        if !settings.allowsPopups(on: tab.url.map(BrowserStore.siteName)),
+           let velaView = webView as? VelaWebView, !velaView.hadRecentUserInput {
+            tab.onPopupBlocked?(url, false)
+            return nil
+        }
         // Open the new window as a tab that stays linked to this page.
         return tab.onOpenWindow?(configuration, url)
     }
@@ -590,18 +616,27 @@ final class TabCoordinator: NSObject, WKNavigationDelegate, WKUIDelegate, WKScri
            tab.reissuedURL != url,
            // A "#section" link on the same page must not reload it.
            url.withoutFragment != webView.url?.withoutFragment {
-            let cleaned = settings.stripTrackingParameters ? TrackingParameters.clean(url) : nil
-            // Link clicks to another site don't carry the header on their own.
-            let needsSignal = settings.globalPrivacyControl
-                && navigationAction.navigationType == .linkActivated
-                && navigationAction.request.value(forHTTPHeaderField: GlobalPrivacyControl.header) == nil
-                && url.host() != webView.url?.host()
-            let target = cleaned ?? url
+            // Only when there are tracking tags to remove. (Vela used to also
+            // reload every link to another site just to add the privacy
+            // header. That threw away where you came from, which banks and
+            // sign-in pages check, so some logins failed. Sites still see
+            // the signal through navigator.globalPrivacyControl.)
+            // Sign-in services are left alone: their addresses carry one-time
+            // codes that must arrive exactly as sent.
+            let host = url.host()?.lowercased() ?? ""
+            let isSignIn = (ContentBlocker.signInDomains + settings.signInSites).contains { host == $0 || host.hasSuffix("." + $0) }
+            let cleaned = settings.stripTrackingParameters && !isSignIn ? TrackingParameters.clean(url) : nil
             // If a site insists on its tags (it redirects straight back to
             // them), let it be rather than loop.
-            if cleaned != nil || needsSignal, target != tab.reissuedURL {
+            if let target = cleaned, target != tab.reissuedURL {
                 var request = URLRequest(url: target)
                 if settings.globalPrivacyControl { request.setValue("1", forHTTPHeaderField: GlobalPrivacyControl.header) }
+                // Keep telling the site which website you came from (just the
+                // website, never the full address), like a normal link would.
+                if let from = webView.url, from.scheme?.lowercased() == "https",
+                   target.scheme?.lowercased() == "https", let origin = from.host() {
+                    request.setValue("https://\(origin)/", forHTTPHeaderField: "Referer")
+                }
                 tab.reissuedURL = target
                 Task { @MainActor in webView.load(request) }
                 return (.cancel, preferences)
@@ -624,12 +659,23 @@ final class TabCoordinator: NSObject, WKNavigationDelegate, WKUIDelegate, WKScri
                 }
             }
             // Google Safe Browsing: known malware and phishing sites.
+            // The page starts loading right away and the check runs next to
+            // it, instead of the page waiting (up to 2 seconds) for Google on
+            // every step. Sign-ins and bank logins bounce through several
+            // addresses in a row, and those waits added up until some gave up.
+            // If Google does flag the address, the page is stopped and the
+            // warning covers it before you can type anything.
             if settings.safeBrowsingEnabled, !isRevisit, !tab.allowedDangerousURLs.contains(url),
-               let threat = await tab.checkThreat?(url) {
-                var report = LinkReport()
-                report.flag(.dangerous, threat.reason)
-                tab.linkWarning = LinkWarning(url: url, report: report)
-                return (.cancel, preferences)
+               let check = tab.checkThreat {
+                Task { @MainActor [weak tab, weak webView] in
+                    guard let threat = await check(url), let tab, let webView else { return }
+                    // Only if you're still on that page.
+                    guard webView.url?.host() == url.host() || webView.url == nil else { return }
+                    webView.stopLoading()
+                    var report = LinkReport()
+                    report.flag(.dangerous, threat.reason)
+                    tab.linkWarning = LinkWarning(url: url, report: report)
+                }
             }
             tab.linkWarning = nil
         }
@@ -661,6 +707,7 @@ final class TabCoordinator: NSObject, WKNavigationDelegate, WKUIDelegate, WKScri
     }
 
     func webView(_ webView: WKWebView, didCommit navigation: WKNavigation!) {
+        tab?.loadError = nil
         tab?.upgradedFrom = nil
         tab?.reissuedURL = nil
         tab?.resetPageStats()
@@ -674,18 +721,62 @@ final class TabCoordinator: NSObject, WKNavigationDelegate, WKUIDelegate, WKScri
 
     /// A page failed before anything appeared. If it was the secure version
     /// Vela tried for an http:// address, show the "Not Secure" warning.
+    /// Otherwise retry once after a hiccup, or explain what went wrong.
     func webView(_ webView: WKWebView, didFailProvisionalNavigation navigation: WKNavigation!, withError error: Error) {
-        guard let tab, let original = tab.upgradedFrom else { return }
+        guard let tab else { return }
         let error = error as NSError
-        if error.domain == NSURLErrorDomain && error.code == NSURLErrorCancelled { return }
-        guard let failed = error.userInfo[NSURLErrorFailingURLErrorKey] as? URL,
-              failed.scheme?.lowercased() == "https", failed.host() == original.host() else { return }
-        tab.upgradedFrom = nil
-        tab.httpsWarning = original
+        if LoadError.isHarmless(error) { return }
+        if let original = tab.upgradedFrom,
+           let failed = error.userInfo[NSURLErrorFailingURLErrorKey] as? URL,
+           failed.scheme?.lowercased() == "https", failed.host() == original.host() {
+            tab.upgradedFrom = nil
+            tab.httpsWarning = original
+            return
+        }
+        handleFailure(error, in: webView, tab: tab)
+    }
+
+    /// A page failed after it started showing (the connection dropped).
+    func webView(_ webView: WKWebView, didFail navigation: WKNavigation!, withError error: Error) {
+        guard let tab else { return }
+        let error = error as NSError
+        if LoadError.isHarmless(error) { return }
+        handleFailure(error, in: webView, tab: tab)
+    }
+
+    /// Secure sites (banks especially) sometimes drop the first connection,
+    /// for example right after your Mac wakes or switches Wi-Fi. Safari
+    /// quietly tries again once; so does Vela. If it fails again, the page
+    /// says what happened, with a Try Again button, instead of staying blank.
+    private func handleFailure(_ error: NSError, in webView: WKWebView, tab: BrowserTab) {
+        let failed = error.userInfo[NSURLErrorFailingURLErrorKey] as? URL ?? webView.url ?? tab.url
+        guard let failed else { return }
+        if LoadError.isTemporary(error), tab.retriedURL != failed {
+            tab.retriedURL = failed
+            Task { @MainActor [weak webView] in
+                try? await Task.sleep(for: .milliseconds(400))
+                webView?.load(URLRequest(url: failed))
+            }
+            return
+        }
+        tab.retriedURL = nil
+        tab.loadError = LoadError(url: failed, error: error)
     }
 
     func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
+        tab?.retriedURL = nil
         tab?.onFinishLoading?()
+    }
+
+    /// The page's helper process stopped (macOS ran low on memory, or the
+    /// page crashed). Without this the tab just goes blank; reload it instead.
+    func webViewWebContentProcessDidTerminate(_ webView: WKWebView) {
+        guard let tab, !tab.isAsleep else { return }
+        if webView.url != nil {
+            webView.reload()
+        } else if let url = tab.url {
+            webView.load(URLRequest(url: url))
+        }
     }
 
     // MARK: Messages from page scripts
@@ -745,8 +836,7 @@ final class TabCoordinator: NSObject, WKNavigationDelegate, WKUIDelegate, WKScri
     }
 
     private func shieldsUp(for tab: BrowserTab, _ settings: PrivacySettings) -> Bool {
-        guard let url = tab.url else { return true }
-        return !settings.shieldsDownSites.contains(BrowserStore.siteName(url))
+        settings.shieldsUp(on: tab.url.map(BrowserStore.siteName))
     }
 }
 

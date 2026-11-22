@@ -126,6 +126,21 @@ struct PrivacySettings: Codable, Equatable {
 
     init() {}
 
+    /// The entries in "shield off" that cover this website: the site itself
+    /// or a site it belongs to (turning it off for slack.com also covers
+    /// app.slack.com, just like the blocking rules do).
+    func shieldsDownEntries(for site: String) -> [String] {
+        let site = site.lowercased()
+        return shieldsDownSites.filter { site == $0 || site.hasSuffix("." + $0) }
+    }
+
+    /// Whether the shield is on for this website.
+    func shieldsUp(on site: String?) -> Bool {
+        guard blockingLevel != .off else { return false }
+        guard let site else { return true }
+        return shieldsDownEntries(for: site).isEmpty
+    }
+
     /// Whether this site may open pop-ups.
     func allowsPopups(on site: String?) -> Bool {
         !blockPopups || (site.map { popupAllowedSites.contains($0) } ?? false)
@@ -163,6 +178,9 @@ struct PrivacySettings: Codable, Equatable {
             blockInterstitialAds: blockInterstitialAds,
             blockEmbeddedAds: blockEmbeddedAds,
             shieldsDownSites: shieldsDownSites,
+            signInSites: signInSites,
+            blockPopups: blockPopups,
+            popupAllowedSites: popupAllowedSites,
             fingerprintProtection: fingerprintProtection,
             globalPrivacyControl: globalPrivacyControl,
             dismissCookieBanners: dismissCookieBanners
@@ -175,6 +193,9 @@ struct PrivacySettings: Codable, Equatable {
         let blockInterstitialAds: Bool
         let blockEmbeddedAds: Bool
         let shieldsDownSites: Set<String>
+        let signInSites: Set<String>
+        let blockPopups: Bool
+        let popupAllowedSites: Set<String>
         let fingerprintProtection: Bool
         let globalPrivacyControl: Bool
         let dismissCookieBanners: Bool
@@ -259,4 +280,6 @@ struct BlockedPopup: Identifiable, Equatable {
     let tabID: UUID
     let url: URL?
     var isPopUnder = false
+    /// The website that tried to open it (for "Always allow").
+    var site: String?
 }

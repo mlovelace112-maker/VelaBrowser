@@ -19,12 +19,16 @@ struct ShieldButton: View {
     @State private var isOpen = false
 
     var body: some View {
-        let isUp = store.shieldsUp(for: tab) && store.privacy.blockingLevel != .off
+        let isUp = store.shieldsUp(for: tab)
         let count = tab.trackersFound.count
 
         Button { isOpen.toggle() } label: {
-            Image(systemName: isUp ? "shield.lefthalf.filled" : "shield.slash")
-                .foregroundStyle(isUp ? Nightglass.accent : Nightglass.mutedText)
+            // On: a filled shield with a check, in the theme color (the same
+            // picture as the panel's "Shield is on"). Off: a crossed-out shield.
+            // (The old "on" picture was a half-filled shield, which read as off.)
+            Image(systemName: isUp ? "checkmark.shield.fill" : "shield.slash")
+                .foregroundStyle(isUp ? Nightglass.accent : Nightglass.caution)
+                .contentTransition(.symbolEffect(.replace))
                 .overlay(alignment: .topTrailing) {
                     if isUp && count > 0 {
                         Text("\(count)")
@@ -40,7 +44,8 @@ struct ShieldButton: View {
                 .animation(Nightglass.spring, value: count)
         }
         .buttonStyle(IconButtonStyle())
-        .help(isUp ? "Shield: \(count) trackers blocked on this page" : "Shield is off for this site")
+        .help(isUp ? "Shield is on: \(count) trackers blocked on this page"
+              : (store.privacy.blockingLevel == .off ? "Shield is off everywhere (Blocking level: Off)" : "Shield is off for this site"))
         .accessibilityLabel(isUp ? "Privacy shield, \(count) trackers blocked" : "Privacy shield off")
         .popover(isPresented: $isOpen, arrowEdge: .bottom) {
             ShieldPopover(tab: tab)
@@ -340,6 +345,16 @@ struct PopupBlockedToast: View {
                     .frame(height: 26)
                     .background(RoundedRectangle(cornerRadius: 8, style: .continuous).strokeBorder(Color.white.opacity(0.18)))
             }
+            // Pop-under ads are never worth allowing for a whole site.
+            if !popup.isPopUnder, let site = popup.site {
+                Button("Always allow") { store.alwaysAllowBlockedPopups() }
+                    .buttonStyle(.plain)
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundStyle(Nightglass.accent)
+                    .padding(.horizontal, 10)
+                    .frame(height: 26)
+                    .help("Let \(site) open new tabs and pop-ups. Undo in Site Settings.")
+            }
             Button { store.blockedPopup = nil } label: {
                 Image(systemName: "xmark").font(.system(size: 9, weight: .bold))
             }
@@ -354,9 +369,12 @@ struct PopupBlockedToast: View {
     }
 
     private var message: String {
-        let kind = popup.isPopUnder ? "Pop-under ad" : "Pop-up"
-        guard let url = popup.url else { return "\(kind) blocked" }
-        return "\(kind) blocked from \(BrowserStore.siteName(url))"
+        if popup.isPopUnder {
+            guard let url = popup.url else { return "Pop-under ad blocked" }
+            return "Pop-under ad blocked from \(BrowserStore.siteName(url))"
+        }
+        guard let site = popup.site else { return "New tab blocked" }
+        return "\(site) tried to open a new tab"
     }
 }
 
