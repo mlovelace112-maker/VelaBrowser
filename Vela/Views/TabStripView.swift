@@ -337,6 +337,10 @@ struct TabChip: View {
             if NSEvent.modifierFlags.contains(.option), store.selectedTabID != tab.id {
                 store.openSplitView(with: tab)
             } else {
+                // Close the hover preview first, so the click isn't spent
+                // closing it and the tab switches on the first click.
+                previewTask?.cancel()
+                showsPreview = false
                 store.select(tab)
             }
         }
@@ -359,14 +363,19 @@ struct TabChip: View {
     /// After resting on another tab for a moment, show a picture of its page.
     private func hoverPreview(_ hovering: Bool) {
         previewTask?.cancel()
-        guard hovering, store.selectedTabID != tab.id, tab.url != nil,
-              UserDefaults.standard.object(forKey: "vela.tabPreviews") as? Bool ?? true else {
+        guard hovering, store.selectedTabID != tab.id, tab.url != nil else {
             showsPreview = false
             return
         }
+        let showsPictures = UserDefaults.standard.object(forKey: "vela.tabPreviews") as? Bool ?? true
         previewTask = Task {
-            try? await Task.sleep(for: .milliseconds(650))
+            // A sleeping tab starts loading while you hover, so clicking it
+            // doesn't mean waiting for the whole page.
+            try? await Task.sleep(for: .milliseconds(250))
             guard !Task.isCancelled else { return }
+            tab.prepareToShow()
+            try? await Task.sleep(for: .milliseconds(650))
+            guard !Task.isCancelled, showsPictures else { return }
             showsPreview = true
         }
     }
@@ -552,14 +561,15 @@ struct GroupChip: View {
 struct FaviconView: View {
     let url: URL?
     var size: CGFloat = 14
+    @State private var icon: NSImage?
 
     var body: some View {
+        let host = url?.host()
         Group {
-            if let host = url?.host(),
-               let iconURL = URL(string: "https://icons.duckduckgo.com/ip3/\(host).ico") {
-                AsyncImage(url: iconURL) { image in
-                    image.resizable().interpolation(.high).scaledToFit()
-                } placeholder: {
+            if host != nil {
+                if let icon = icon ?? host.flatMap { FaviconCache.shared.cached($0) } {
+                    Image(nsImage: icon).resizable().interpolation(.high).scaledToFit()
+                } else {
                     RoundedRectangle(cornerRadius: 3).fill(Color.white.opacity(0.15))
                 }
             } else {
@@ -572,5 +582,41 @@ struct FaviconView: View {
         .frame(width: size, height: size)
         .clipShape(RoundedRectangle(cornerRadius: size * 0.22, style: .continuous))
         .accessibilityHidden(true)
+        .task(id: host) {
+            icon = nil
+            guard let host else { return }
+            icon = await FaviconCache.shared.icon(for: host)
+        }
+    }
+}
+
+/// Site icons, downloaded once per website and kept in memory. Before,
+/// every tab, bookmark and address bar fetched its icon again whenever it
+/// was redrawn (for example on every tab switch), with a grey square
+/// flashing in the meantime.
+@MainActor
+final class FaviconCache {
+    static let shared = FaviconCache()
+    private var icons: [String: NSImage] = [:]
+    private var loading: [String: Task<NSImage?, Never>] = [:]
+
+    func cached(_ host: String) -> NSImage? { icons[host] }
+
+    func icon(for host: String) async -> NSImage? {
+        if let icon = icons[host] { return icon }
+        if let task = loading[host] { return await task.value }
+        let task = Task<NSImage?, Never> {
+            guard let url = URL(string: "https://icons.duckduckgo.com/ip3/\(host).ico"),
+                  let response = try? await URLSession.shared.data(from: url) else { return nil }
+            return NSImage(data: response.0)
+        }
+        loading[host] = task
+        let icon = await task.value
+        loading[host] = nil
+        if let icon {
+            if icons.count > 500 { icons.removeAll() }
+            icons[host] = icon
+        }
+        return icon
     }
 }
