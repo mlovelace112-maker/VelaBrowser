@@ -332,15 +332,31 @@ final class BrowserTab: Identifiable {
     /// A small picture of the page, shown when you hover over the tab.
     /// Kept in memory only.
     var preview: NSImage?
+    @ObservationIgnored private var previewTakenAt: Date?
+    @ObservationIgnored private var previewURL: URL?
 
     /// Takes the hover picture while the page is on screen.
     func capturePreview() {
         guard url != nil, !isAsleep, webView.window != nil else { return }
+        // Taking a picture makes the page draw itself again. Doing that on
+        // every tab switch slowed switching down, so a picture less than
+        // 30 seconds old is kept.
+        if let taken = previewTakenAt, Date().timeIntervalSince(taken) < 30, previewURL == url { return }
+        previewTakenAt = Date()
+        previewURL = url
         let configuration = WKSnapshotConfiguration()
         configuration.snapshotWidth = 360
         webView.takeSnapshot(with: configuration) { [weak self] image, _ in
             if let image { self?.preview = image }
         }
+    }
+
+    /// Starts loading a sleeping tab's page while your pointer rests on its
+    /// tab, so it's ready (or nearly) by the time you click.
+    func prepareToShow() {
+        guard isAsleep else { return }
+        lastActive = Date() // so the sleep timer doesn't put it straight back
+        wake()
     }
 
     /// Loads a sleeping tab's page again.
