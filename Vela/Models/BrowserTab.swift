@@ -234,6 +234,8 @@ final class BrowserTab: Identifiable {
         contentController.removeAllUserScripts()
         contentController.addUserScript(ContentBlocker.popupGuardScript(
             popUnderProtection: privacy.blockingLevel != .off && privacy.popUnderProtection,
+            blockNewTabs: privacy.blockPopups,
+            allowedSites: privacy.popupAllowedSites,
             shieldsDownSites: privacy.shieldsDownSites
         ))
         contentController.addUserScript(ContentBlocker.trackerScanScript())
@@ -507,6 +509,15 @@ final class TabCoordinator: NSObject, WKNavigationDelegate, WKUIDelegate, WKScri
         if settings.blockingLevel != .off, settings.popUnderProtection, shieldsUp(for: tab, settings),
            let url, let host = url.host(), ContentBlocker.isTracker(host) {
             tab.onPopupBlocked?(url, true)
+            return nil
+        }
+        // A page may open a new tab or window only right after you clicked
+        // or pressed a key in it. Tabs a site opens by itself (on a timer,
+        // when the page loads, or seconds after a click) are stopped, and
+        // the "New tab blocked" notice lets you allow it once or always.
+        if !settings.allowsPopups(on: tab.url.map(BrowserStore.siteName)),
+           let velaView = webView as? VelaWebView, !velaView.hadRecentUserInput {
+            tab.onPopupBlocked?(url, false)
             return nil
         }
         // Open the new window as a tab that stays linked to this page.

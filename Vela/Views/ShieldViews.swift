@@ -340,6 +340,16 @@ struct PopupBlockedToast: View {
                     .frame(height: 26)
                     .background(RoundedRectangle(cornerRadius: 8, style: .continuous).strokeBorder(Color.white.opacity(0.18)))
             }
+            // Pop-under ads are never worth allowing for a whole site.
+            if !popup.isPopUnder, let site = popup.site {
+                Button("Always allow") { store.alwaysAllowBlockedPopups() }
+                    .buttonStyle(.plain)
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundStyle(Nightglass.accent)
+                    .padding(.horizontal, 10)
+                    .frame(height: 26)
+                    .help("Let \(site) open new tabs and pop-ups. Undo in Site Settings.")
+            }
             Button { store.blockedPopup = nil } label: {
                 Image(systemName: "xmark").font(.system(size: 9, weight: .bold))
             }
@@ -354,9 +364,12 @@ struct PopupBlockedToast: View {
     }
 
     private var message: String {
-        let kind = popup.isPopUnder ? "Pop-under ad" : "Pop-up"
-        guard let url = popup.url else { return "\(kind) blocked" }
-        return "\(kind) blocked from \(BrowserStore.siteName(url))"
+        if popup.isPopUnder {
+            guard let url = popup.url else { return "Pop-under ad blocked" }
+            return "Pop-under ad blocked from \(BrowserStore.siteName(url))"
+        }
+        guard let site = popup.site else { return "New tab blocked" }
+        return "\(site) tried to open a new tab"
     }
 }
 

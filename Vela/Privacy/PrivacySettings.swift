@@ -164,6 +164,8 @@ struct PrivacySettings: Codable, Equatable {
             blockEmbeddedAds: blockEmbeddedAds,
             shieldsDownSites: shieldsDownSites,
             signInSites: signInSites,
+            blockPopups: blockPopups,
+            popupAllowedSites: popupAllowedSites,
             fingerprintProtection: fingerprintProtection,
             globalPrivacyControl: globalPrivacyControl,
             dismissCookieBanners: dismissCookieBanners
@@ -177,6 +179,8 @@ struct PrivacySettings: Codable, Equatable {
         let blockEmbeddedAds: Bool
         let shieldsDownSites: Set<String>
         let signInSites: Set<String>
+        let blockPopups: Bool
+        let popupAllowedSites: Set<String>
         let fingerprintProtection: Bool
         let globalPrivacyControl: Bool
         let dismissCookieBanners: Bool
@@ -261,4 +265,6 @@ struct BlockedPopup: Identifiable, Equatable {
     let tabID: UUID
     let url: URL?
     var isPopUnder = false
+    /// The website that tried to open it (for "Always allow").
+    var site: String?
 }

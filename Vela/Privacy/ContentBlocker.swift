@@ -222,43 +222,71 @@ enum ContentBlocker {
 
     /// Runs at the start of every page and frame. Pages open pop-ups with
     /// `window.open`. WebKit already blocks the ones you didn't click for; this
-    /// notices when that happens so Vela can show "Pop-up blocked · Allow once".
+    /// notices when that happens so Vela can show "Pop-up blocked · Allow".
+    ///
+    /// **New tabs only when you ask:** with "Block pop-ups" on, a page can
+    /// only open a new tab when you clicked a real link or button. A click on
+    /// an empty part of the page, or a link the page "clicks" by itself, no
+    /// longer opens a tab. Sites in your allowed list are left alone.
     ///
     /// **Pop-unders** are sneakier: the page waits for you to click *anywhere*
     /// (so it counts as "you clicked"), then opens an ad tab. With pop-under
     /// protection on, a click that wasn't on a link or button can't open a tab
-    /// to a different website.
-    static func popupGuardScript(popUnderProtection: Bool, shieldsDownSites: Set<String>) -> WKUserScript {
+    /// to a different website (even on sites allowed to open pop-ups).
+    static func popupGuardScript(
+        popUnderProtection: Bool,
+        blockNewTabs: Bool = true,
+        allowedSites: Set<String> = [],
+        shieldsDownSites: Set<String>
+    ) -> WKUserScript {
         let source = """
         (() => {
           if (window.__velaPopupGuard) return;
           window.__velaPopupGuard = true;
           const shieldsDown = \(jsonArray(shieldsDownSites.sorted()));
+          const allowed = \(jsonArray(allowedSites.sorted()));
           const host = location.hostname;
-          const shieldOff = shieldsDown.some((s) => host === s || host.endsWith('.' + s));
+          let topHost = host;
+          try { topHost = window.top.location.hostname || host; } catch (e) {}
+          const matches = (list, h) => list.some((s) => h === s || h.endsWith('.' + s));
+          const shieldOff = matches(shieldsDown, host);
           const POPUNDER = \(popUnderProtection) && !shieldOff;
+          const ASK = \(blockNewTabs) && !matches(allowed, topHost.replace(/^www\\./, ''));
           const post = (message) => {
             try { window.webkit.messageHandlers.\(messageName).postMessage(message); } catch (e) {}
           };
+          const CONTROLS = 'a[href], button, input, select, textarea, label, summary, [role="button"], [role="link"], [role="menuitem"], [role="tab"]';
           let lastClick = null;
-          document.addEventListener('click', (e) => { lastClick = { target: e.target, time: Date.now() }; }, true);
+          document.addEventListener('click', (e) => {
+            if (e.isTrusted) { lastClick = { target: e.target, time: Date.now() }; return; }
+            // A link the page "clicked" by itself to open a new tab.
+            if (!ASK) return;
+            const link = e.target && e.target.closest ? e.target.closest('a[href]') : null;
+            const target = link ? (link.getAttribute('target') || '').toLowerCase() : '';
+            if (link && target && !['_self', '_parent', '_top'].includes(target)) {
+              e.preventDefault();
+              e.stopImmediatePropagation();
+              post({ type: 'popup', url: link.href, popunder: false });
+            }
+          }, true);
           const siteOf = (h) => h.replace(/^www\\./, '');
           const original = window.open;
           window.open = function (url, ...rest) {
             const clicked = navigator.userActivation ? navigator.userActivation.isActive : true;
             let href = '';
             try { href = url ? new URL(url, location.href).href : ''; } catch (e) {}
-            if (POPUNDER && clicked && href) {
-              const recent = lastClick && Date.now() - lastClick.time < 1500 ? lastClick.target : null;
-              const control = recent && recent.closest
-                ? recent.closest('a[href], button, input, select, textarea, label, summary, [role="button"], [role="link"], [role="menuitem"], [role="tab"]')
-                : null;
-              let otherSite = true;
-              try { otherSite = siteOf(new URL(href).hostname) !== siteOf(host); } catch (e) {}
-              if (!control && otherSite) {
-                post({ type: 'popup', url: href, popunder: true });
-                return null;
-              }
+            const recent = lastClick && Date.now() - lastClick.time < 1500 ? lastClick.target : null;
+            const control = recent && recent.closest ? recent.closest(CONTROLS) : null;
+            let otherSite = true;
+            try { otherSite = siteOf(new URL(href).hostname) !== siteOf(host); } catch (e) {}
+            if (POPUNDER && clicked && href && !control && otherSite) {
+              post({ type: 'popup', url: href, popunder: true });
+              return null;
+            }
+            // Opened without you clicking a real link or button.
+            if (ASK && (!clicked || !control)) {
+              post({ type: 'popup', url: href, popunder: false });
+              return null;
             }
             const opened = original.call(window, url, ...rest);
             if (!opened && !clicked) {

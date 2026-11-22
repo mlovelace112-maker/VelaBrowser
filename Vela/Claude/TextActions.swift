@@ -59,6 +59,27 @@ final class VelaWebView: WKWebView {
     var onTextAction: ((TextAction) -> Void)?
     /// Set by the store; Highlight (false) or Highlight with Note… (true).
     var onHighlight: ((Bool) -> Void)?
+    /// When you last clicked or typed in this page. A page may only open a
+    /// new tab right after you did something, never by itself.
+    private(set) var lastUserInput = Date.distantPast
+
+    /// True if you clicked or pressed a key here in the last second.
+    var hadRecentUserInput: Bool { Date().timeIntervalSince(lastUserInput) < 1 }
+
+    override func mouseDown(with event: NSEvent) {
+        lastUserInput = Date()
+        super.mouseDown(with: event)
+    }
+
+    override func otherMouseDown(with event: NSEvent) {
+        lastUserInput = Date()
+        super.otherMouseDown(with: event)
+    }
+
+    override func keyDown(with event: NSEvent) {
+        lastUserInput = Date()
+        super.keyDown(with: event)
+    }
 
     override func willOpenMenu(_ menu: NSMenu, with event: NSEvent) {
         super.willOpenMenu(menu, with: event)
