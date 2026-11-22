@@ -53,7 +53,7 @@ A review of Vela's code after the scrolling tabs, Safari extensions, read aloud,
 | An extension could silently grant itself extra features (like reading cookies or history) while running. | Low | **Fixed:** new features an extension asks for while running need your OK. |
 | A page could fake a "pop-up blocked" notice with a non-web address, which Allow Once would open. | Low | **Fixed:** Allow Once only opens `http` and `https` addresses. |
 | `main` has no branch protection yet, so a mistaken push would ship as a beta. | Low | **Waiting on the owner:** run `scripts/secure-repo.sh` once. |
-| Vela turns off macOS library validation so Sparkle loads in builds without a team ID. Releases are now signed with a real certificate, so this could be turned back on. | Low (needs someone already on your Mac) | **Open:** can be changed after testing on a Mac, since a mistake would stop Vela from launching. |
+| Vela turned off macOS library validation so Sparkle loads in builds without a team ID. | Low (needs someone already on your Mac) | **Fixed:** releases signed with the owner's certificate now keep library validation on, so macOS only loads code into Vela that the same team (or Apple) signed. The release stops if Sparkle's team ID doesn't match. Builds made locally in Xcode still turn it off, since they have no team ID. |
 
 ### What Vela can't do
 
