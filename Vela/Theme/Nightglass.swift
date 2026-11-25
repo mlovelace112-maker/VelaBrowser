@@ -13,6 +13,19 @@ enum Nightglass {
     static let text = Color(hex: 0xEDEEF2)
     static let secondaryText = Color(hex: 0xC9CCD6)
     static let mutedText = Color(hex: 0x9BA0AE)
+
+    // Tab colors. Tabs sit right on the see-through glass, so a bright
+    // wallpaper or page can show behind them; these stay readable on both.
+    /// The tab you're on: pure white.
+    static let activeTabText = Color.white
+    /// Every other tab: a soft white, much brighter than `mutedText`.
+    static let tabText = Color(hex: 0xDCDFE7)
+    /// A faint shadow under tab titles and icons that keeps them crisp
+    /// when something light shows through the glass.
+    static let tabTextShadow = Color.black.opacity(0.5)
+    /// A thin dark layer behind the tab row, so the glass never gets light
+    /// enough to wash out the text.
+    static let tabBacking = Color.black.opacity(0.22)
     static var accent: Color { Appearance.shared.accent }
     static var claude: Color { Color(hex: theme.warm) }
     static var spotify: Color { Color(hex: theme.cool) }
@@ -112,6 +125,7 @@ private struct IconButtonBody: View {
         configuration.label
             .font(.system(size: 14, weight: .medium))
             .foregroundStyle(isHovering ? Nightglass.text : Nightglass.secondaryText)
+            .shadow(color: Nightglass.tabTextShadow.opacity(0.6), radius: 1, y: 0.5)
             .frame(width: size, height: size)
             .background(
                 RoundedRectangle(cornerRadius: 8, style: .continuous)

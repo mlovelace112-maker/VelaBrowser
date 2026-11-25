@@ -45,6 +45,7 @@ struct TabStripView: View {
         .padding(.leading, 80) // room for the red/yellow/green window buttons
         .padding(.trailing, 10)
         .frame(height: compact ? 38 : 44)
+        .background(Nightglass.tabBacking)
         .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { stripWidth = $0 }
         .animation(Nightglass.spring, value: items.map(\.id))
         .onChange(of: store.selectedTabID) { _, id in
@@ -196,6 +197,7 @@ private struct AllTabsMenu: View {
         } label: {
             Image(systemName: "chevron.down")
                 .font(.system(size: 11, weight: .bold))
+                .foregroundStyle(Nightglass.tabText)
         }
         .menuStyle(.borderlessButton)
         .menuIndicator(.hidden)
@@ -248,10 +250,24 @@ struct TabChip: View {
         let compact = Appearance.shared.settings.compactTabs
         let container = store.container(for: tab)
         let isInSplit = store.splitPair?.contains(tab.id) == true
+        // Worked out up here (not inside the modifiers below) so the Swift
+        // compiler doesn't have to puzzle out one giant expression.
+        let titleColor: Color = isSelected ? Nightglass.activeTabText
+            : (isHovering ? Nightglass.text : Nightglass.tabText)
+        // The tab you're on gets a brighter glass pill; the others a faint
+        // dark one, so their text has something steady to sit on.
+        let fill: Color = isSelected ? Color.white.opacity(0.16)
+            : (isHovering ? Color.white.opacity(0.09) : Color.black.opacity(0.12))
+        let border: Color = tab.isPrivate ? Nightglass.accent.opacity(isSelected ? 0.6 : 0.3)
+            : Color.white.opacity(isSelected ? 0.2 : (isHovering ? 0.08 : 0))
+        let fade: Double = tab.isAsleep && !isSelected && !isHovering ? 0.72 : 1
+        let tooltip: String = tab.isAsleep ? "\(tab.title) (sleeping to save memory)"
+            : container.map { "\(tab.title) (\($0.name))" } ?? (tab.isPinned ? tab.title : "")
 
         HStack(spacing: 8) {
             ZStack(alignment: .bottomTrailing) {
                 FaviconView(url: tab.url)
+                    .shadow(color: Nightglass.tabTextShadow, radius: 1, y: 0.5)
                 if tab.isPrivate {
                     Image(systemName: "eyeglasses")
                         .font(.system(size: 7, weight: .bold))
@@ -263,8 +279,9 @@ struct TabChip: View {
             }
             if !tab.isPinned {
                 Text(tab.title)
-                    .font(.system(size: 12.5))
-                    .foregroundStyle(isSelected ? Nightglass.text : Nightglass.mutedText)
+                    .font(.system(size: 12.5, weight: isSelected ? .semibold : .medium))
+                    .foregroundStyle(titleColor)
+                    .shadow(color: Nightglass.tabTextShadow, radius: 1.5, y: 0.5)
                     .lineLimit(1)
                     .truncationMode(.tail)
                 Spacer(minLength: 0)
@@ -273,7 +290,7 @@ struct TabChip: View {
                     Button { tab.toggleMute() } label: {
                         Image(systemName: tab.isMuted ? "speaker.slash.fill" : "speaker.wave.2.fill")
                             .font(.system(size: 9.5, weight: .semibold))
-                            .foregroundStyle(tab.isMuted ? Nightglass.mutedText : Nightglass.accent)
+                            .foregroundStyle(tab.isMuted ? Nightglass.tabText : Nightglass.accent)
                     }
                     .buttonStyle(IconButtonStyle(size: 18))
                     .help(tab.isMuted ? "Unmute this tab (⌃⌘M)" : "Mute this tab (⌃⌘M)")
@@ -302,10 +319,8 @@ struct TabChip: View {
         .frame(minWidth: tab.isPinned ? 36 : (isVertical ? 0 : (compact ? 70 : 90)),
                maxWidth: tab.isPinned ? 36 : (isVertical || width != nil ? .infinity : (compact ? 160 : 200)))
         .frame(height: compact ? 26 : 30)
-        .background(shape.fill(Color.white.opacity(isSelected ? 0.12 : (isHovering ? 0.06 : 0))))
-        .overlay(shape.strokeBorder(
-            tab.isPrivate ? Nightglass.accent.opacity(isSelected ? 0.6 : 0.3) : Color.white.opacity(isSelected ? 0.14 : 0)
-        ))
+        .background(shape.fill(fill))
+        .overlay(shape.strokeBorder(border))
         .overlay(alignment: .bottom) {
             if let group, !isVertical {
                 Capsule().fill(group.color.color).frame(height: 2).padding(.horizontal, 10)
@@ -329,8 +344,8 @@ struct TabChip: View {
             }
         }
         .shadow(color: .black.opacity(isSelected ? 0.35 : 0), radius: 8, y: 3)
-        // Sleeping tabs fade a little, like Firefox and Edge.
-        .opacity(tab.isAsleep && !isSelected ? 0.55 : 1)
+        // Sleeping tabs fade a little, like Firefox and Edge, but stay readable.
+        .opacity(fade)
         .contentShape(Rectangle())
         .onTapGesture {
             // ⌥-click: show this tab next to the current one.
@@ -352,8 +367,7 @@ struct TabChip: View {
             TabPreviewCard(tab: tab)
         }
         .animation(.easeOut(duration: 0.15), value: isHovering)
-        .help(tab.isAsleep ? "\(tab.title) (sleeping to save memory)"
-              : container.map { "\(tab.title) (\($0.name))" } ?? (tab.isPinned ? tab.title : ""))
+        .help(tooltip)
         .accessibilityElement(children: .contain)
         .accessibilityLabel(tab.title)
         .accessibilityAddTraits(.isButton)
@@ -518,19 +532,22 @@ struct GroupChip: View {
                 Circle().fill(tint).frame(width: 8, height: 8)
                 Text(group.name)
                     .font(.system(size: 12, weight: .semibold))
+                    .foregroundStyle(Nightglass.activeTabText)
                     .lineLimit(1)
                 Text("\(store.tabCount(in: group))")
                     .font(.system(size: 11, weight: .semibold))
-                    .opacity(0.7)
+                    .foregroundStyle(Nightglass.tabText)
                 Image(systemName: "chevron.right")
                     .font(.system(size: 8, weight: .bold))
+                    .foregroundStyle(tint)
                     .rotationEffect(.degrees(group.isCollapsed ? 0 : 90))
             }
-            .foregroundStyle(tint)
+            .shadow(color: Nightglass.tabTextShadow, radius: 1.5, y: 0.5)
             .padding(.horizontal, 10)
             .frame(height: 26)
-            .background(Capsule().fill(tint.opacity(0.16)))
-            .overlay(Capsule().strokeBorder(tint.opacity(0.45)))
+            .background(Capsule().fill(Color.black.opacity(0.18)))
+            .background(Capsule().fill(tint.opacity(0.26)))
+            .overlay(Capsule().strokeBorder(tint.opacity(0.7)))
             .contentShape(Capsule())
         }
         .buttonStyle(.plain)
@@ -569,8 +586,12 @@ struct FaviconView: View {
             if host != nil {
                 if let icon = icon ?? host.flatMap { FaviconCache.shared.cached($0) } {
                     Image(nsImage: icon).resizable().interpolation(.high).scaledToFit()
+                        // A black logo (GitHub, X, Notion…) would vanish on the
+                        // dark glass, so it gets a small light tile behind it.
+                        .padding(FaviconCache.shared.isDark(icon) ? size * 0.1 : 0)
+                        .background(FaviconCache.shared.isDark(icon) ? Color.white.opacity(0.9) : Color.clear)
                 } else {
-                    RoundedRectangle(cornerRadius: 3).fill(Color.white.opacity(0.15))
+                    RoundedRectangle(cornerRadius: 3).fill(Color.white.opacity(0.28))
                 }
             } else {
                 Image(systemName: "sparkle")
@@ -600,7 +621,47 @@ final class FaviconCache {
     private var icons: [String: NSImage] = [:]
     private var loading: [String: Task<NSImage?, Never>] = [:]
 
+    private var darkness: [ObjectIdentifier: Bool] = [:]
+
     func cached(_ host: String) -> NSImage? { icons[host] }
+
+    /// True when an icon is almost all black or very dark grey, so it would
+    /// be hard to see on Vela's dark glass. Worked out once per icon.
+    func isDark(_ image: NSImage) -> Bool {
+        let key = ObjectIdentifier(image)
+        if let known = darkness[key] { return known }
+        // Shrink the icon to 16×16 and average the brightness of the
+        // pixels you can actually see (ignoring the transparent ones).
+        var pixels = [UInt8](repeating: 0, count: 16 * 16 * 4)
+        var dark = false
+        if let cgImage = image.cgImage(forProposedRect: nil, context: nil, hints: nil) {
+            pixels.withUnsafeMutableBytes { buffer in
+                guard let context = CGContext(data: buffer.baseAddress, width: 16, height: 16,
+                                              bitsPerComponent: 8, bytesPerRow: 16 * 4,
+                                              space: CGColorSpaceCreateDeviceRGB(),
+                                              bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue)
+                else { return }
+                context.draw(cgImage, in: CGRect(x: 0, y: 0, width: 16, height: 16))
+            }
+            var brightness = 0.0
+            var visible = 0.0
+            for i in stride(from: 0, to: pixels.count, by: 4) {
+                let alpha = Double(pixels[i + 3]) / 255
+                guard alpha > 0.4 else { continue }
+                // Colors are premultiplied, so divide the transparency back out.
+                let r = Double(pixels[i]) / 255 / alpha
+                let g = Double(pixels[i + 1]) / 255 / alpha
+                let b = Double(pixels[i + 2]) / 255 / alpha
+                brightness += 0.2126 * r + 0.7152 * g + 0.0722 * b
+                visible += 1
+            }
+            // Mostly opaque icons have their own background, so leave those alone.
+            dark = visible > 0 && visible < 16 * 16 * 0.85 && brightness / visible < 0.22
+        }
+        if darkness.count > 500 { darkness.removeAll() }
+        darkness[key] = dark
+        return dark
+    }
 
     func icon(for host: String) async -> NSImage? {
         if let icon = icons[host] { return icon }
