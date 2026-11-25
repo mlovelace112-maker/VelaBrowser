@@ -46,7 +46,7 @@ struct VerticalTabsView: View {
                         .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
-                .foregroundStyle(Nightglass.mutedText)
+                .foregroundStyle(Nightglass.tabText)
                 .contextMenu {
                     Button("New Private Tab") { store.newTab(isPrivate: true) }
                     Section("New Tab in Container") {
@@ -66,6 +66,7 @@ struct VerticalTabsView: View {
         .padding(10)
         .frame(width: 230)
         .clipped() // nothing inside may push the list off the window's edge
+        .background(Nightglass.tabBacking)
         .background(VisualEffectBackground())
         .overlay(alignment: .trailing) {
             Rectangle().fill(Nightglass.stroke).frame(width: 1)
@@ -97,8 +98,8 @@ struct SplitPane: View {
             HStack(spacing: 8) {
                 FaviconView(url: tab.url, size: 13)
                 Text(tab.url == nil ? "New Tab" : tab.title)
-                    .font(.system(size: 11.5))
-                    .foregroundStyle(Nightglass.mutedText)
+                    .font(.system(size: 11.5, weight: .medium))
+                    .foregroundStyle(Nightglass.tabText)
                     .lineLimit(1)
                 Spacer()
                 Button { store.closeSplitView() } label: { Image(systemName: "xmark") }
