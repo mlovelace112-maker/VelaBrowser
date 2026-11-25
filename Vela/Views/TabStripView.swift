@@ -250,6 +250,19 @@ struct TabChip: View {
         let compact = Appearance.shared.settings.compactTabs
         let container = store.container(for: tab)
         let isInSplit = store.splitPair?.contains(tab.id) == true
+        // Worked out up here (not inside the modifiers below) so the Swift
+        // compiler doesn't have to puzzle out one giant expression.
+        let titleColor: Color = isSelected ? Nightglass.activeTabText
+            : (isHovering ? Nightglass.text : Nightglass.tabText)
+        // The tab you're on gets a brighter glass pill; the others a faint
+        // dark one, so their text has something steady to sit on.
+        let fill: Color = isSelected ? Color.white.opacity(0.16)
+            : (isHovering ? Color.white.opacity(0.09) : Color.black.opacity(0.12))
+        let border: Color = tab.isPrivate ? Nightglass.accent.opacity(isSelected ? 0.6 : 0.3)
+            : Color.white.opacity(isSelected ? 0.2 : (isHovering ? 0.08 : 0))
+        let fade: Double = tab.isAsleep && !isSelected && !isHovering ? 0.72 : 1
+        let tooltip: String = tab.isAsleep ? "\(tab.title) (sleeping to save memory)"
+            : container.map { "\(tab.title) (\($0.name))" } ?? (tab.isPinned ? tab.title : "")
 
         HStack(spacing: 8) {
             ZStack(alignment: .bottomTrailing) {
@@ -267,8 +280,7 @@ struct TabChip: View {
             if !tab.isPinned {
                 Text(tab.title)
                     .font(.system(size: 12.5, weight: isSelected ? .semibold : .medium))
-                    .foregroundStyle(isSelected ? Nightglass.activeTabText
-                                     : (isHovering ? Nightglass.text : Nightglass.tabText))
+                    .foregroundStyle(titleColor)
                     .shadow(color: Nightglass.tabTextShadow, radius: 1.5, y: 0.5)
                     .lineLimit(1)
                     .truncationMode(.tail)
@@ -307,14 +319,8 @@ struct TabChip: View {
         .frame(minWidth: tab.isPinned ? 36 : (isVertical ? 0 : (compact ? 70 : 90)),
                maxWidth: tab.isPinned ? 36 : (isVertical || width != nil ? .infinity : (compact ? 160 : 200)))
         .frame(height: compact ? 26 : 30)
-        // The tab you're on gets a brighter glass pill; the others a faint
-        // dark one, so their text has something steady to sit on.
-        .background(shape.fill(isSelected ? Color.white.opacity(0.16)
-                               : (isHovering ? Color.white.opacity(0.09) : Color.black.opacity(0.12))))
-        .overlay(shape.strokeBorder(
-            tab.isPrivate ? Nightglass.accent.opacity(isSelected ? 0.6 : 0.3)
-                : Color.white.opacity(isSelected ? 0.2 : (isHovering ? 0.08 : 0))
-        ))
+        .background(shape.fill(fill))
+        .overlay(shape.strokeBorder(border))
         .overlay(alignment: .bottom) {
             if let group, !isVertical {
                 Capsule().fill(group.color.color).frame(height: 2).padding(.horizontal, 10)
@@ -339,7 +345,7 @@ struct TabChip: View {
         }
         .shadow(color: .black.opacity(isSelected ? 0.35 : 0), radius: 8, y: 3)
         // Sleeping tabs fade a little, like Firefox and Edge, but stay readable.
-        .opacity(tab.isAsleep && !isSelected && !isHovering ? 0.72 : 1)
+        .opacity(fade)
         .contentShape(Rectangle())
         .onTapGesture {
             // ⌥-click: show this tab next to the current one.
@@ -361,8 +367,7 @@ struct TabChip: View {
             TabPreviewCard(tab: tab)
         }
         .animation(.easeOut(duration: 0.15), value: isHovering)
-        .help(tab.isAsleep ? "\(tab.title) (sleeping to save memory)"
-              : container.map { "\(tab.title) (\($0.name))" } ?? (tab.isPinned ? tab.title : ""))
+        .help(tooltip)
         .accessibilityElement(children: .contain)
         .accessibilityLabel(tab.title)
         .accessibilityAddTraits(.isButton)
@@ -584,7 +589,7 @@ struct FaviconView: View {
                         // A black logo (GitHub, X, Notion…) would vanish on the
                         // dark glass, so it gets a small light tile behind it.
                         .padding(FaviconCache.shared.isDark(icon) ? size * 0.1 : 0)
-                        .background(FaviconCache.shared.isDark(icon) ? Color.white.opacity(0.9) : .clear)
+                        .background(FaviconCache.shared.isDark(icon) ? Color.white.opacity(0.9) : Color.clear)
                 } else {
                     RoundedRectangle(cornerRadius: 3).fill(Color.white.opacity(0.28))
                 }
