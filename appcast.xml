@@ -4,6 +4,16 @@
     <title>Vela</title>
     <description>Updates for the Vela browser</description>
     <item>
+      <title>Vela 1.0-beta.35</title>
+      <pubDate>Wed, 25 Nov 2026 12:59:44 GMT</pubDate>
+      <sparkle:version>35</sparkle:version>
+      <sparkle:shortVersionString>1.0-beta.35</sparkle:shortVersionString>
+      <sparkle:minimumSystemVersion>15.0</sparkle:minimumSystemVersion>
+      <sparkle:channel>beta</sparkle:channel>
+      <description>&lt;p&gt;A beta build with the newest changes.&lt;/p&gt;&lt;ul&gt;&lt;li&gt;Split up the tab&amp;#x27;s styling so the compiler can type-check it&lt;/li&gt;&lt;li&gt;Make tab titles and icons easier to read on the glass&lt;/li&gt;&lt;/ul&gt;</description>
+      <enclosure url="https://github.com/mlovelace112-maker/VelaBrowser/releases/download/v1.0-beta.35/Vela-1.0-beta.35.zip" sparkle:edSignature="uLwkuu2bdJP/4JD1/7rY96s9Q4D81NMyS5gOZ9RiXyBoDUMG1KY1sPjHqH+h6AZ4ErtlKIMrs4MoArwU8zAvBQ==" length="9279468" type="application/octet-stream" />
+    </item>
+    <item>
       <title>Vela 1.0-beta.34</title>
       <pubDate>Sun, 22 Nov 2026 23:49:49 GMT</pubDate>
       <sparkle:version>34</sparkle:version>
@@ -291,16 +301,6 @@
       <sparkle:channel>beta</sparkle:channel>
       <description>&lt;p&gt;A beta build with the newest changes.&lt;/p&gt;&lt;ul&gt;&lt;li&gt;Fill saved passwords when you click into a login box&lt;/li&gt;&lt;/ul&gt;</description>
       <enclosure url="https://github.com/mlovelace112-maker/VelaBrowser/releases/download/v1.0-beta.4/Vela-1.0-beta.4.zip" sparkle:edSignature="L3yNqE18rFxMlrGcJSDMxp7y+LEnFy6Snu3tfkUbRmD/BDI8TzXvmDTKvrukUTdEzH7oCkTwcr+sn7RPLcyfDA==" length="5931595" type="application/octet-stream" />
-    </item>
-    <item>
-      <title>Vela 1.0-beta.3</title>
-      <pubDate>Thu, 19 Nov 2026 15:06:58 GMT</pubDate>
-      <sparkle:version>3</sparkle:version>
-      <sparkle:shortVersionString>1.0-beta.3</sparkle:shortVersionString>
-      <sparkle:minimumSystemVersion>15.0</sparkle:minimumSystemVersion>
-      <sparkle:channel>beta</sparkle:channel>
-      <description>&lt;p&gt;A beta build with the newest changes.&lt;/p&gt;&lt;ul&gt;&lt;li&gt;Add a one-command script that saves the signing certificate for updates&lt;/li&gt;&lt;/ul&gt;</description>
-      <enclosure url="https://github.com/mlovelace112-maker/VelaBrowser/releases/download/v1.0-beta.3/Vela-1.0-beta.3.zip" sparkle:edSignature="Km0aIvNDZ8xzffUBrXePZ1m3Oc7TLbsMAHq1ZMyo+Ot/70dh21B2ciDHuMwZBk0XZxbAcYJaefge72j0n87ZAQ==" length="5907459" type="application/octet-stream" />
     </item>
   </channel>
 </rss>
