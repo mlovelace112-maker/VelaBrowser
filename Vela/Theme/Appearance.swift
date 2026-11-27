@@ -15,6 +15,8 @@ struct Theme: Identifiable, Equatable {
     /// The two soft glows behind the glass.
     let glowTop: UInt32
     let glowBottom: UInt32
+    /// Themes past the first six unlock as you level up in Play (0 = always available).
+    var unlockLevel: Int = 0
 
     static let all: [Theme] = [
         Theme(id: "nightglass", name: "Nightglass", background: 0x07080C, accent: 0x8B7CFF,
@@ -29,6 +31,17 @@ struct Theme: Identifiable, Equatable {
               warm: 0xFFB38A, cool: 0xB9ADFF, glowTop: 0x4A1430, glowBottom: 0x2A1F5C),
         Theme(id: "graphite", name: "Graphite", background: 0x0B0B0C, accent: 0xD0D3DA,
               warm: 0xE8875F, cool: 0x8FD6B8, glowTop: 0x1E1F24, glowBottom: 0x16171A),
+        // Unlocked by leveling up (see Play/PlayModels.swift).
+        Theme(id: "supernova", name: "Supernova", background: 0x0C0610, accent: 0xFF5DA2,
+              warm: 0xFFC65C, cool: 0x7FD8C4, glowTop: 0x5C1F4A, glowBottom: 0x3A1F6C, unlockLevel: 2),
+        Theme(id: "cosmic-candy", name: "Cosmic Candy", background: 0x080A14, accent: 0x7FE3FF,
+              warm: 0xFF9AD5, cool: 0xB9FF9A, glowTop: 0x1F3A6C, glowBottom: 0x5C1F5A, unlockLevel: 4),
+        Theme(id: "solar-flare", name: "Solar Flare", background: 0x100804, accent: 0xFFB347,
+              warm: 0xFF6B3D, cool: 0xFFE27A, glowTop: 0x5C2A0A, glowBottom: 0x4A0F1A, unlockLevel: 6),
+        Theme(id: "emerald-nebula", name: "Emerald Nebula", background: 0x04100A, accent: 0x5BFFB0,
+              warm: 0xFFD166, cool: 0x7FD8FF, glowTop: 0x0A4A2A, glowBottom: 0x1A2A5C, unlockLevel: 8),
+        Theme(id: "galaxy-gold", name: "Galaxy Gold", background: 0x07060A, accent: 0xFFD166,
+              warm: 0xFF8A5B, cool: 0xB9ADFF, glowTop: 0x3A2A0A, glowBottom: 0x2A1F5C, unlockLevel: 10),
     ]
 }
 
@@ -77,7 +90,14 @@ final class Appearance {
         Theme.all.first { $0.id == settings.themeID } ?? Theme.all[0]
     }
 
-    var accent: Color { Color(hex: settings.customAccent ?? theme.accent) }
+    /// Colors borrowed from the album playing on Spotify (Play ▸ mood
+    /// theming), or nil. Not saved: it follows the music.
+    var mood: MoodPalette?
+
+    var accent: Color { Color(hex: mood?.accent ?? settings.customAccent ?? theme.accent) }
+    /// The two soft glows behind the glass, tinted by the music when it's on.
+    var glowTop: UInt32 { mood?.glowTop ?? theme.glowTop }
+    var glowBottom: UInt32 { mood?.glowBottom ?? theme.glowBottom }
 
     func reset() {
         settings = AppearanceSettings()

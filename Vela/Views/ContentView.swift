@@ -8,6 +8,7 @@ struct ContentView: View {
 
     var body: some View {
         @Bindable var store = store
+        @Bindable var play = store.play
 
         VStack(spacing: 0) {
             VStack(spacing: 0) {
@@ -84,6 +85,16 @@ struct ContentView: View {
         .ignoresSafeArea()
         .background(Nightglass.background)
         .background { KeyboardWatcher() }
+        // Tints Vela with the album art while Spotify plays (Play).
+        .background { MoodThemeWatcher() }
+        // Confetti, "Badge earned!" banners and other Play moments.
+        .overlay { PlayOverlay() }
+        .sheet(isPresented: $play.isHubVisible) {
+            PlayHub()
+        }
+        .sheet(isPresented: $play.isYearInReviewVisible) {
+            YearInReviewView()
+        }
         // The command bar (⌘K) floats over everything, near the top.
         .overlay(alignment: .top) {
             if store.isCommandBarVisible {
@@ -160,6 +171,8 @@ private struct PageArea: View {
                         .id(tab.id)
                         .transition(.move(edge: .bottom).combined(with: .opacity))
                 } else if tab.url == nil {
+                    // A moving background you unlocked in Play, if you picked one.
+                    PlayBackdropLayer()
                     NewTabPage(tab: tab)
                         .transition(.opacity)
                 } else {

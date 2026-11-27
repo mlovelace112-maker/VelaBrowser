@@ -84,15 +84,16 @@ struct NightglassBackdrop: View {
         ZStack {
             Nightglass.background
             RadialGradient(
-                colors: [Color(hex: theme.glowTop).opacity(glow), .clear],
+                colors: [Color(hex: appearance.glowTop).opacity(glow), .clear],
                 center: UnitPoint(x: 0.15, y: 0.2), startRadius: 0, endRadius: 700
             )
             RadialGradient(
-                colors: [Color(hex: theme.glowBottom).opacity(glow), .clear],
+                colors: [Color(hex: appearance.glowBottom).opacity(glow), .clear],
                 center: UnitPoint(x: 0.85, y: 0.8), startRadius: 0, endRadius: 650
             )
         }
         .animation(.easeInOut(duration: 0.4), value: theme)
+        .animation(.easeInOut(duration: 1.2), value: appearance.mood)
     }
 }
 
