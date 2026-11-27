@@ -170,6 +170,18 @@ struct LoadErrorView: View {
     var body: some View {
         ZStack {
             NightglassBackdrop()
+            VStack(spacing: 20) {
+                message
+                // No internet? Play Star Catcher while you wait (Play).
+                if failure.isOffline, Play.shared.isOn, Play.shared.settings.offlineGame {
+                    StarCatcherCard()
+                        .transition(.scale(scale: 0.95).combined(with: .opacity))
+                }
+            }
+        }
+    }
+
+    private var message: some View {
             VStack(alignment: .leading, spacing: 16) {
                 Image(systemName: "wifi.exclamationmark")
                     .font(.system(size: 30, weight: .semibold))
@@ -206,7 +218,6 @@ struct LoadErrorView: View {
             .frame(maxWidth: 520, alignment: .leading)
             .glassPanel(cornerRadius: 18)
             .shadow(color: .black.opacity(0.5), radius: 30, y: 12)
-        }
     }
 }
 
