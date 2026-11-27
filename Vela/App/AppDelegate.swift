@@ -51,6 +51,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         // Remember your tabs for next time (Settings ▸ General ▸ Tabs).
         store.saveSession()
         store.activity.save()
+        store.play.save()
         store.pageMemory.save()
         guard store.privacy.clearCookiesOnQuit else { return .terminateNow }
 

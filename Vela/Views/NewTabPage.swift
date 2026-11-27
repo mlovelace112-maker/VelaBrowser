@@ -102,6 +102,11 @@ struct NewTabPage: View {
                 .frame(maxWidth: 680)
             }
 
+            // Streak, level and this week's challenges (Play).
+            if !tab.isPrivate {
+                PlayNewTabCard()
+            }
+
             if Appearance.shared.settings.showBlockedStats,
                store.trackersBlockedTotal + store.popupsBlockedTotal > 0 {
                 Label {

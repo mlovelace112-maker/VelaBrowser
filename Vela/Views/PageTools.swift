@@ -316,6 +316,10 @@ extension BrowserStore {
 
     func setRead(_ item: ReadingItem, _ isRead: Bool) {
         guard let index = readingList.firstIndex(where: { $0.id == item.id }) else { return }
+        // Finishing something counts toward reading bingo (Play).
+        if isRead, !readingList[index].isRead {
+            play.finishedReading(url: item.url, title: item.title, added: item.added)
+        }
         readingList[index].isRead = isRead
         saveReadingList()
     }

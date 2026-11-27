@@ -173,6 +173,10 @@ enum CommandSearch {
 
         var results: [CommandItem] = []
         var seen = Set<String>()
+        // A secret word? Show its hidden row first (Play/EasterEggs.swift).
+        if let egg = easterEggItem(for: query, store: store) {
+            results.append(egg)
+        }
         func add(_ items: [CommandItem], limit: Int) {
             var added = 0
             for item in items where added < limit {
@@ -358,7 +362,7 @@ enum CommandSearch {
                 list.append(command("Translate Page", "translate") { tab.translateRequests += 1 })
             }
         }
-        return list
+        return list + playCommands(store)
     }
 }
 

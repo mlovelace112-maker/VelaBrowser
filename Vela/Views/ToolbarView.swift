@@ -51,6 +51,9 @@ struct ToolbarView: View {
 
                 ShieldButton(tab: tab)
 
+                // Pip and your level and streak (Play).
+                PlayToolbarItems()
+
                 if !store.downloadManager.items.isEmpty {
                     DownloadsButton()
                         .transition(.scale.combined(with: .opacity))

@@ -212,6 +212,7 @@ extension BrowserStore {
               let url = tab.url, ["http", "https"].contains(url.scheme?.lowercased() ?? "") else { return }
         guard ActivityLog.secondsSinceInput < ActivityLog.idleLimit || tab.isPlayingAudio else { return }
         activity.addTime(ActivityLog.tick, to: BrowserStore.siteName(url))
+        play.addBrowsingTime(ActivityLog.tick, site: BrowserStore.siteName(url))
     }
 
     /// Mondays (or the first launch after one): point at the new report once.

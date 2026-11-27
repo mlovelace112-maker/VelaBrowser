@@ -41,6 +41,20 @@ struct LoadError: Equatable {
         }
     }
 
+    /// No internet (or it dropped out): the page shows the Star Catcher game.
+    var isOffline: Bool {
+        guard domain == NSURLErrorDomain else { return false }
+        return [
+            NSURLErrorNotConnectedToInternet,
+            NSURLErrorNetworkConnectionLost,
+            NSURLErrorDataNotAllowed,
+            NSURLErrorInternationalRoamingOff,
+            NSURLErrorCannotConnectToHost,
+            NSURLErrorTimedOut,
+            NSURLErrorDNSLookupFailed,
+        ].contains(code)
+    }
+
     /// Not really errors: you stopped the page, or it moved on to another one.
     static func isHarmless(_ error: NSError) -> Bool {
         if error.domain == NSURLErrorDomain && error.code == NSURLErrorCancelled { return true }

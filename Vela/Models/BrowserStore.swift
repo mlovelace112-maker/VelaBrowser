@@ -108,6 +108,8 @@ final class BrowserStore {
 
     // Weekly activity and privacy report (ActivityLog.swift)
     let activity = ActivityLog()
+    /// Points, streaks, badges, Pip and the rest of Vela's playful side (Play/).
+    let play = Play.shared
     var isActivityReportVisible = false
     /// "What was that page?" (PageMemory.swift)
     let pageMemory = PageMemory()
@@ -213,6 +215,7 @@ final class BrowserStore {
         downloadManager.checkThreat = { [weak self] url in await self?.safeBrowsing.check(url) }
         if !restoreSession() { newTab() }
         claude.store = self
+        play.privacyScore = { [weak self] in self?.privacyScore ?? 0 }
         extensions.store = self
         extensions.start()
         Task {
@@ -527,11 +530,14 @@ final class BrowserStore {
         let ungrouped = tabs.filter { $0.groupID == nil && !$0.isPinned && $0.url != nil }
         let bySite = Dictionary(grouping: ungrouped) { Self.siteName($0.url!) }
 
+        var madeGroups = false
         for (site, siteTabs) in bySite.sorted(by: { $0.key < $1.key }) where siteTabs.count >= 2 {
             let group = TabGroup(name: site, color: nextGroupColor())
             groups.append(group)
             siteTabs.forEach { $0.groupID = group.id }
+            madeGroups = true
         }
+        if madeGroups { play.record(.tidy) }
     }
 
     /// Puts every tab from this tab's website into one group, joining the
@@ -599,6 +605,7 @@ final class BrowserStore {
         guard tab.url != nil, tab.mediaSearch == nil, !tab.isLoading || tab.progress > 0.6 else { return }
         do {
             tab.reader = try await Reader.extract(from: tab)
+            if !tab.isPrivate { play.record(.reader) }
         } catch {
             showNotice("Reader isn't available for this page.")
         }
@@ -902,6 +909,7 @@ final class BrowserStore {
                 self.checkFocus()
                 self.checkWatchedPages()
                 self.activity.save()
+                self.play.save()
                 self.pageMemory.save()
                 self.announceWeeklyReportIfDue()
                 self.saveSession()
@@ -914,17 +922,25 @@ final class BrowserStore {
     func sleepIdleTabs(force: Bool = false) async {
         guard force || tabSleepMinutes > 0 else { return }
         let cutoff = Date().addingTimeInterval(-Double(tabSleepMinutes) * 60)
+        var sleptCount = 0
+        defer {
+            if sleptCount > 0 {
+                play.bubble(.sleepy, sleptCount == 1 ? "Tucked a tab into bed. Zzz…" : "Tucked \(sleptCount) tabs into bed. Zzz…")
+            }
+        }
         for tab in tabs where tab.id != selectedTabID && !tab.isAsleep && !tab.isPinned && tab.url != nil
             && splitPair?.contains(tab.id) != true {
             guard force || tab.lastActive < cutoff else { continue }
             if tab.isLoading || tab.isUsingCamera || tab.isUsingMicrophone || tab.permissionRequest != nil { continue }
             if await tab.webView.requestMediaPlaybackState() == .playing { continue }
             tab.sleep()
+            sleptCount += 1
         }
     }
 
     /// Tabs ▸ Put Other Tabs to Sleep.
     func sleepOtherTabs() {
+        play.record(.tidy)
         Task { await sleepIdleTabs(force: true) }
     }
 
@@ -971,6 +987,10 @@ final class BrowserStore {
             } else {
                 settings.lockdownSites.insert(site)
             }
+        }
+        if privacy.lockdownSites.contains(site), !tab.isPrivate {
+            play.record(.lockdown)
+            play.bubble(.cheer, "\(site) is locked down tight. 🔒", force: true)
         }
     }
 
@@ -1026,7 +1046,10 @@ final class BrowserStore {
         guard shieldsUp(for: tab), !tab.trackersFound.contains(domain) else { return }
         tab.trackersFound.append(domain)
         trackersBlockedTotal += 1
-        if !tab.isPrivate { activity.recordTrackerBlocked() }
+        if !tab.isPrivate {
+            activity.recordTrackerBlocked()
+            play.trackerBlocked(domain)
+        }
         UserDefaults.standard.set(trackersBlockedTotal, forKey: "vela.trackersBlockedTotal")
     }
 
@@ -1034,7 +1057,10 @@ final class BrowserStore {
         guard isPopUnder ? privacy.popUnderProtection : privacy.blockPopups else { return }
         if let url { tab.popupsBlocked.append(url) }
         popupsBlockedTotal += 1
-        if !tab.isPrivate { activity.recordPopupBlocked() }
+        if !tab.isPrivate {
+            activity.recordPopupBlocked()
+            play.record(.popups)
+        }
         UserDefaults.standard.set(popupsBlockedTotal, forKey: "vela.popupsBlockedTotal")
 
         let popup = BlockedPopup(tabID: tab.id, url: url, isPopUnder: isPopUnder, site: tab.url.map(Self.siteName))
@@ -1179,6 +1205,7 @@ final class BrowserStore {
             let bookmark = Bookmark(title: tab.title, url: url)
             bookmarks.append(bookmark)
             fileNewBookmark(bookmark)
+            if !tab.isPrivate { play.record(.bookmarks) }
         }
         saveBookmarks()
     }
@@ -1246,6 +1273,7 @@ final class BrowserStore {
         } else {
             history.insert(HistoryEntry(title: tab.title, url: url, date: Date()), at: 0)
             activity.recordPage(url)
+            play.recordPage()
             if history.count > Self.historyLimit { history.removeLast(history.count - Self.historyLimit) }
         }
         saveHistory()
