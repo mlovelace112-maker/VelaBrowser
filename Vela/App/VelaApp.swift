@@ -61,6 +61,12 @@ struct BrowserCommands: Commands {
         CommandGroup(after: .appInfo) {
             Button("Check for Updates…") { Updater.shared.checkNow() }
                 .disabled(!Updater.shared.isAvailable)
+            Button("Play: Level and Badges…") {
+                store.play.hubSection = .overview
+                store.play.isHubVisible = true
+            }
+            .velaShortcut("Play", "j", modifiers: [.command, .shift])
+            .disabled(!store.play.isOn)
         }
         CommandGroup(after: .appSettings) {
             Button("Make Vela the Default Browser") {
@@ -144,6 +150,7 @@ struct BrowserCommands: Commands {
                 .velaShortcut("Find a Page I've Seen", "y", modifiers: [.command, .option])
             Button("Weekly Report") { store.isActivityReportVisible = true }
                 .velaShortcut("Weekly Report", "r", modifiers: [.command, .option])
+            Button("Year in Review") { store.play.isYearInReviewVisible = true }
             Button("Clear History") { store.clearHistory() }
         }
 

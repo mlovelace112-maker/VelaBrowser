@@ -151,12 +151,14 @@ extension BrowserStore {
     func startFocus(minutes: Int?) {
         focusUntil = minutes.map { Date().addingTimeInterval(Double($0) * 60) } ?? .distantFuture
         focusBreaks = [:]
+        play.focusStarted(minutes: minutes)
         blockOpenFocusSites()
         showNotice(minutes.map { "Focus mode on for \($0 < 60 ? "\($0) minutes" : "\($0 / 60) hour\($0 >= 120 ? "s" : "")")" }
                    ?? "Focus mode on until you turn it off")
     }
 
     func stopFocus() {
+        if focusUntil != nil { play.focusStopped() }
         focusUntil = nil
         if !focusSchedule.isActive() {
             for tab in tabs where tab.focusBlocked != nil { leaveFocusScreen(in: tab, load: true) }
@@ -168,6 +170,7 @@ extension BrowserStore {
     func checkFocus() {
         if let focusUntil, focusUntil <= Date() {
             self.focusUntil = nil
+            play.focusFinished()
             if !focusSchedule.isActive() { showNotice("Focus session finished. Nice work!") }
         }
         if isFocusActive { blockOpenFocusSites() }

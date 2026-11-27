@@ -16,6 +16,8 @@ struct SettingsView: View {
                 .tabItem { Label("Sites", systemImage: "globe") }
             FocusSettingsTab()
                 .tabItem { Label("Focus", systemImage: "leaf") }
+            PlaySettingsTab()
+                .tabItem { Label("Play", systemImage: "sparkles") }
             ExtensionSettingsTab()
                 .tabItem { Label("Extensions", systemImage: "puzzlepiece.extension") }
             ClaudeSettingsTab()
@@ -126,7 +128,8 @@ struct AppearanceSettingsTab: View {
         Form {
             Section("Theme") {
                 LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 12), count: 3), spacing: 12) {
-                    ForEach(Theme.all) { theme in
+                    // Themes past the first six unlock as you level up in Play.
+                    ForEach(Theme.all.filter { $0.unlockLevel <= Play.shared.level }) { theme in
                         ThemeSwatch(theme: theme, isSelected: appearance.settings.themeID == theme.id) {
                             withAnimation(.easeInOut(duration: 0.3)) {
                                 appearance.settings.themeID = theme.id
@@ -136,6 +139,12 @@ struct AppearanceSettingsTab: View {
                     }
                 }
                 .padding(.vertical, 4)
+
+                if let next = Theme.all.filter({ $0.unlockLevel > Play.shared.level }).min(by: { $0.unlockLevel < $1.unlockLevel }) {
+                    Text("Reach level \(next.unlockLevel) in Play to unlock the \(next.name) theme.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
 
                 ColorPicker("Accent color", selection: Binding(
                     get: { appearance.accent },
