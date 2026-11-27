@@ -471,16 +471,16 @@ private struct ChallengesSection: View {
             .glassPanel(cornerRadius: 16)
 
             HStack(spacing: 14) {
-                StatTile(value: "\(done)/3", label: "done this week", icon: "checkmark.seal.fill")
-                StatTile(value: Play.weekEnds.formatted(.relative(presentation: .named)), label: "new challenges", icon: "clock.fill")
-                StatTile(value: "\(play.state.perfectWeeks)", label: "perfect weeks", icon: "trophy.fill")
+                PlayStatTile(value: "\(done)/3", label: "done this week", icon: "checkmark.seal.fill")
+                PlayStatTile(value: Play.weekEnds.formatted(.relative(presentation: .named)), label: "new challenges", icon: "clock.fill")
+                PlayStatTile(value: "\(play.state.perfectWeeks)", label: "perfect weeks", icon: "trophy.fill")
             }
         }
     }
 }
 
 /// A small glass tile with a big number.
-struct StatTile: View {
+struct PlayStatTile: View {
     let value: String
     let label: String
     let icon: String
@@ -540,8 +540,8 @@ private struct PlanetSection: View {
                             .controlSize(.large)
                         }
                     }
-                    StatTile(value: "\(play.state.garden.count)", label: "things growing", icon: "leaf.fill", color: Nightglass.safe)
-                    StatTile(value: "\(play.total(.focusMinutes)) min", label: "focused in all", icon: "timer", color: Nightglass.safe)
+                    PlayStatTile(value: "\(play.state.garden.count)", label: "things growing", icon: "leaf.fill", color: Nightglass.safe)
+                    PlayStatTile(value: "\(play.total(.focusMinutes)) min", label: "focused in all", icon: "timer", color: Nightglass.safe)
                     Text("Longer quests grow rarer things: flowers at 15 minutes, trees at 30, crystals at an hour.")
                         .font(.system(size: 11.5))
                         .foregroundStyle(Nightglass.mutedText)
@@ -568,9 +568,9 @@ private struct BingoSection: View {
                 BingoCardView()
                     .frame(width: 360)
                 VStack(alignment: .leading, spacing: 12) {
-                    StatTile(value: "\(play.state.bingoFilled.count)/9", label: "squares filled", icon: "square.grid.3x3.fill", color: Color(hex: 0xF07FB4))
-                    StatTile(value: "\(play.total(.bingos))", label: "bingos all time", icon: "star.fill", color: Color(hex: 0xF07FB4))
-                    StatTile(value: "\(store.readingList.filter { !$0.isRead }.count)", label: "waiting in your Reading List", icon: "books.vertical.fill", color: Color(hex: 0xF07FB4))
+                    PlayStatTile(value: "\(play.state.bingoFilled.count)/9", label: "squares filled", icon: "square.grid.3x3.fill", color: Color(hex: 0xF07FB4))
+                    PlayStatTile(value: "\(play.total(.bingos))", label: "bingos all time", icon: "star.fill", color: Color(hex: 0xF07FB4))
+                    PlayStatTile(value: "\(store.readingList.filter { !$0.isRead }.count)", label: "waiting in your Reading List", icon: "books.vertical.fill", color: Color(hex: 0xF07FB4))
                     Button("Open Reading List") {
                         dismiss()
                         store.showSidebar(.readingList)
@@ -769,9 +769,9 @@ private struct YearSection: View {
             HubTitle(title: "Your \(year) in Vela",
                      subtitle: "A private recap made on your Mac from what Play counted. Nothing is sent anywhere.")
             HStack(spacing: 14) {
-                StatTile(value: hours(play.thisYear(.minutes)), label: "browsing", icon: "clock.fill")
-                StatTile(value: play.thisYear(.trackers).formatted(), label: "trackers blocked", icon: "shield.fill", color: Nightglass.safe)
-                StatTile(value: play.thisYear(.pages).formatted(), label: "pages explored", icon: "safari.fill", color: Color(hex: 0x5B9CFF))
+                PlayStatTile(value: hours(play.thisYear(.minutes)), label: "browsing", icon: "clock.fill")
+                PlayStatTile(value: play.thisYear(.trackers).formatted(), label: "trackers blocked", icon: "shield.fill", color: Nightglass.safe)
+                PlayStatTile(value: play.thisYear(.pages).formatted(), label: "pages explored", icon: "safari.fill", color: Color(hex: 0x5B9CFF))
             }
             Button {
                 play.isHubVisible = false

@@ -519,17 +519,20 @@ final class Play {
     // MARK: - Dates
 
     /// "2026-11-27"
-    static func dayKey(_ date: Date = Date()) -> String { ActivityLog.key(for: date) }
+    nonisolated static func dayKey(_ date: Date = Date()) -> String {
+        let parts = Calendar.current.dateComponents([.year, .month, .day], from: date)
+        return String(format: "%04d-%02d-%02d", parts.year ?? 0, parts.month ?? 0, parts.day ?? 0)
+    }
 
     /// "2026-W48": the week runs Monday to Sunday.
-    static func weekKey(_ date: Date = Date()) -> String {
+    nonisolated static func weekKey(_ date: Date = Date()) -> String {
         var calendar = Calendar(identifier: .iso8601)
         calendar.timeZone = .current
         let parts = calendar.dateComponents([.yearForWeekOfYear, .weekOfYear], from: date)
         return String(format: "%04d-W%02d", parts.yearForWeekOfYear ?? 0, parts.weekOfYear ?? 0)
     }
 
-    static func yearKey(_ date: Date = Date()) -> String {
+    nonisolated static func yearKey(_ date: Date = Date()) -> String {
         String(Calendar.current.component(.year, from: date))
     }
 
